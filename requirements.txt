@@ -1,0 +1,14 @@
+# requirements.txt
+langchain
+langchain-core
+langchain-community
+psycopg2-binary
+sentence-transformers
+torch
+torchvision
+torchaudio
+openai
+google-generativeai
+llama-cpp-python
+spacy
+python-dotenv
