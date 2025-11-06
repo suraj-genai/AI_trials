@@ -1,5 +1,5 @@
 from langchain_community.chat_models import ChatOpenAI
-from config import (
+from core.config import (
     AI_PROVIDER,
     OPENAI_API_KEY, OPENAI_API_BASE, OPENAI_MODEL,
     ABACUS_API_KEY, ABACUS_API_BASE, ABACUS_MODEL
@@ -13,7 +13,7 @@ def get_ai_response(prompt: str) -> str:
             openai_api_key=OPENAI_API_KEY,
             model=OPENAI_MODEL,
             base_url=OPENAI_API_BASE,
-            temperature=0.7,
+            temperature=1,
         )
         return llm.invoke(prompt).content
 
@@ -24,7 +24,8 @@ def get_ai_response(prompt: str) -> str:
             base_url=ABACUS_API_BASE,
             temperature=0.7,
         )
-        return llm.invoke(prompt).content
+        response = llm.invoke(prompt)
+        return response.content
 
     else:
         return "Invalid AI provider selected. Please set AI_PROVIDER in .env."

@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-AI_PROVIDER = os.getenv("AI_PROVIDER", "openai")
+AI_PROVIDER = "abacus" #os.getenv("AI_PROVIDER", "openai")
 
 # OpenAI
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
@@ -12,5 +12,5 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5")
 
 # Abacus
 ABACUS_API_KEY = os.getenv("ABACUS_API_KEY", "")
-ABACUS_API_BASE = os.getenv("ABACUS_API_BASE", "https://app.abacus.ai/api/v1/openai/v1")
-ABACUS_MODEL = os.getenv("ABACUS_MODEL", "gpt-4-turbo")
+ABACUS_API_BASE = os.getenv("ABACUS_API_BASE", "https://routellm.abacus.ai/v1")
+ABACUS_MODEL = os.getenv("ABACUS_MODEL", "route-llm")

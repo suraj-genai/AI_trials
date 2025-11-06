@@ -1,6 +1,7 @@
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, jsonify
 from routes.chat import chat_bp
 from routes.health import health_bp
+
 import os
 
 app = Flask(__name__)
