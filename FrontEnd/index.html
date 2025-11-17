@@ -1,153 +1,256 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script src="https://cdn.jsdelivr.net/npm/showdown/dist/showdown.min.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Personal AI Assistant</title>
-  <!-- 
-    To view this app on your mobile:
-    1. Place this HTML inside your Flask app's templates or static folder.
-    2. Run Flask with: flask run --host=0.0.0.0 --port=7860
-    3. On your mobile (connected to the same Wi-Fi), open: http://<your-PC-IP>:7860
-  -->
+  <script src="https://cdn.jsdelivr.net/npm/showdown/dist/showdown.min.js"></script>
   <style>
-    body {
-      background: #f5f5f5;
-      font-family: 'Segoe UI', Roboto, sans-serif;
-      margin: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
+    :root {
+      --bg-color: #f9fafb;
+      --chat-bg: #ffffff;
+      --user-bubble: #e0e7ff;
+      --assistant-bubble: #f3f4f6;
+      --accent: #2e5cff;
+      --font-color: #111827;
     }
-    #app {
-      width: 95%;
-      max-width: 500px;
-      background: #fff;
-      border-radius: 16px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+
+    body {
+      font-family: 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-color);
+      margin: 0;
+      height: 100vh;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
     }
+
     header {
-      background: #2e5cff;
+      background: var(--accent);
       color: white;
       text-align: center;
       padding: 1rem;
       font-size: 1.2rem;
       font-weight: 600;
     }
-    #chat-log {
+
+    #chat-container {
       flex: 1;
       overflow-y: auto;
       padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      background: var(--chat-bg);
+      scroll-behavior: smooth;
     }
+
     .message {
-      margin-bottom: 1rem;
-      line-height: 1.4;
+      max-width: 80%;
+      line-height: 1.6;
+      padding: 10px 14px;
+      border-radius: 12px;
       word-wrap: break-word;
+      white-space: pre-wrap;
     }
+
     .user {
-      text-align: right;
-      color: #2e5cff;
-      font-weight: 500;
+      align-self: flex-end;
+      background: var(--user-bubble);
+      color: var(--accent);
+      border-radius: 12px 12px 0 12px;
     }
+
     .assistant {
-      text-align: left;
-      color: #333;
+      align-self: flex-start;
+      background: var(--assistant-bubble);
+      color: var(--font-color);
+      border-radius: 12px 12px 12px 0;
     }
+
     footer {
       display: flex;
-      border-top: 1px solid #eee;
-      padding: 0.5rem;
-      background: #fafafa;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      background: #f9fafb;
+      border-top: 1px solid #e5e7eb;
     }
+
     #user-input {
       flex: 1;
-      border: none;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
       padding: 0.75rem;
       font-size: 1rem;
-      border-radius: 8px;
       outline: none;
-      background: #f0f0f0;
-      margin-right: 0.5rem;
+      resize: none;
+      height: 2.5rem;
+      background-color: white;
     }
-    button {
-      background: #2e5cff;
+
+    #send-btn {
+      margin-left: 0.5rem;
+      background: var(--accent);
       color: white;
       border: none;
-      border-radius: 8px;
+      border-radius: 10px;
       padding: 0.75rem 1.25rem;
       cursor: pointer;
       font-weight: 600;
       transition: 0.2s;
     }
-    button:hover {
+
+    #send-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #send-btn:hover:enabled {
       background: #2348cc;
+    }
+
+    @media (max-width: 768px) {
+      header { font-size: 1rem; padding: 0.75rem; }
+      #chat-container { padding: 0.5rem; }
+      #user-input { font-size: 0.95rem; padding: 0.6rem; height: 2.2rem; }
+      #send-btn { font-size: 0.9rem; padding: 0.6rem 1rem; }
+      footer { padding: 0.5rem; }
     }
   </style>
 </head>
+
 <body>
-  <div id="app">
-    <header>Personal AI Assistant</header>
-    <div id="chat-log"></div>
-    <footer>
-      <input id="user-input" placeholder="Type your message..." />
-      <button id="send-btn">Send</button>
-    </footer>
-  </div>
+  <header id="app-header">Personal AI Assistant</header>
+
+  <div id="chat-container"></div>
+
+  <footer>
+    <textarea id="user-input" placeholder="Type your message..."></textarea>
+    <button id="send-btn" disabled>Send</button>
+  </footer>
 
   <script>
-    const chatLog = document.getElementById('chat-log');
+    const chatContainer = document.getElementById('chat-container');
     const userInput = document.getElementById('user-input');
     const sendBtn = document.getElementById('send-btn');
-
-    sendBtn.addEventListener('click', sendMessage);
-    userInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') sendMessage();
-    });
-
+    const appHeader = document.getElementById('app-header');
     const converter = new showdown.Converter();
 
-    async function sendMessage() {
-      const message = userInput.value.trim();
-      if (!message) return;
+    let isGenerating = false;
+    let eventSource = null;
 
-      appendMessage('user', message);
-      userInput.value = '';
-
-      appendMessage('assistant', 'Thinking...');
-
-      try {
-        const res = await fetch('/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message })
-        });
-        const data = await res.json();
-        chatLog.lastChild.innerHTML = converter.makeHtml(data.reply.replace(/\n/g, '<br>'));
-      } catch (err) {
-        chatLog.lastChild.innerHTML = 'Error: Could not connect to server';
-      }
-
-      chatLog.scrollTop = chatLog.scrollHeight;
+    // Device detection
+    function isMobileDevice() {
+      return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
     }
 
+    window.addEventListener('load', () => {
+      appHeader.textContent = isMobileDevice()
+        ? "Personal AI Assistant (Mobile)"
+        : "Personal AI Assistant (Desktop)";
+    });
 
+    // Button enable logic
+    userInput.addEventListener('input', () => {
+      sendBtn.disabled = userInput.value.trim().length === 0 || isGenerating;
+    });
+
+    // Send button click
+    sendBtn.addEventListener('click', () => {
+      if (isGenerating) stopGeneration();
+      else startGeneration();
+    });
+
+    // Enter key
+    userInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (!sendBtn.disabled) startGeneration();
+      }
+    });
+
+    async function startGeneration() {
+      const message = userInput.value.trim();
+      if (!message) return;
+      userInput.value = ''; // ✅ clear after sending
+
+      // close old streams if any
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+
+      isGenerating = true;
+      sendBtn.textContent = "Stop";
+      sendBtn.disabled = false;
+      userInput.disabled = true;
+
+      appendMessage('user', message);
+      const assistantDiv = appendMessage('assistant', '');
+      assistantDiv.classList.add('typing');
+      assistantDiv.textContent = 'Thinking';
+      let accumulatedText = '';  // declare before onmessage
+      eventSource = new EventSource("/stream?message=" + encodeURIComponent(message));
+
+      eventSource.onmessage = (event) => {
+        if (event.data === "[END]") {
+          eventSource.close();
+          // Apply Markdown formatting only once at the end
+          const html = converter.makeHtml(accumulatedText);
+          assistantDiv.innerHTML = html;
+          cleanupUI();
+        } else {
+          // remove typing animation if active
+          if (assistantDiv.classList.contains('typing')) {
+            assistantDiv.classList.remove('typing');
+            assistantDiv.textContent = '';
+          }
+
+          // Clean and append incoming text
+          const cleanChunk = event.data.replace(/\r/g, '').replace(/\u0000/g, '');
+          accumulatedText += cleanChunk;
+
+          // show plain text for now (no markdown during stream)
+          assistantDiv.textContent = accumulatedText;
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+      };
+
+      eventSource.onerror = (err) => {
+        console.error("Stream error:", err);
+        cleanupUI();
+      };
+    }
+
+    async function stopGeneration() {
+      sendBtn.disabled = true;
+      if (eventSource) {
+        eventSource.close();
+        await fetch('/stop', { method: 'POST' });
+      }
+      cleanupUI();
+    }
+
+    function cleanupUI() {
+      isGenerating = false;
+      sendBtn.textContent = "Send";
+      userInput.disabled = false;
+      sendBtn.disabled = userInput.value.trim().length === 0;
+      eventSource = null;
+    }
 
     function appendMessage(sender, text) {
       const div = document.createElement('div');
       div.className = `message ${sender}`;
-      if (sender === 'assistant') {
-        const html = converter.makeHtml(text.replace(/\n/g, '<br>'));
-        div.innerHTML = html;
-      } else {
-        div.textContent = text;
-      }
-      chatLog.appendChild(div);
+      div.innerHTML = text.replace(/\n/g, '<br>');
+      chatContainer.appendChild(div);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+      return div;
     }
+
+    // Mobile keyboard height fix
+    window.addEventListener('resize', () => {
+      document.body.style.height = window.innerHeight + 'px';
+    });
   </script>
 </body>
 </html>
