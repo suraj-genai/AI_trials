@@ -2,6 +2,7 @@
 from flask import Blueprint, request, Response, stream_with_context, jsonify
 from core.ai_agent import agent
 import time
+import json
 import asyncio
 chat_bp = Blueprint("chat", __name__)
 
@@ -22,9 +23,11 @@ def chat_stream():
 
             # Use the singleton agent instance
             async def run_stream():
-                async for token in agent.stream_response(user_message, date):
-                    yield f"data: {token}\n\n"
-                yield "data: [DONE]\n\n"
+                async for chunk_data in agent.stream_response(user_message, date):
+                    json_data = json.dumps(chunk_data)
+                    print(f"[Flask] Sending JSON: {json_data}")
+                    yield f"data: {json_data}\n\n"
+                yield "data: {\"done\": true}\n\n"
 
                 # Execute the async generator
 

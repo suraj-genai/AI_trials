@@ -6,7 +6,7 @@ from core.config import (
     OPENAI_API_KEY, OPENAI_API_BASE, OPENAI_MODEL,
     ABACUS_API_KEY, ABACUS_API_BASE, ABACUS_MODEL
 )
-
+from core.database import db
 # System prompt for journaling assistant
 SYSTEM_PROMPT = """
 You are a warm, empathetic journaling assistant. 
@@ -60,18 +60,33 @@ class JournalAgent:
         print(f"✅ JournalAgent initialized with {AI_PROVIDER} provider")
 
     def get_conversation_history(self, date: str):
-        """Get conversation history for a specific date"""
+        """Get conversation history for a specific date from database"""
         if date not in conversation_memory:
+            # Load from database
+            messages_from_db = db.get_messages(date)
+
+            # Convert to LangChain message format
             conversation_memory[date] = [SystemMessage(content=SYSTEM_PROMPT)]
+
+            for msg in messages_from_db:
+                if msg['role'] == 'user':
+                    conversation_memory[date].append(HumanMessage(content=msg['content']))
+                elif msg['role'] == 'assistant':
+                    conversation_memory[date].append(AIMessage(content=msg['content']))
+
         return conversation_memory[date]
 
     def add_to_conversation(self, date: str, role: str, content: str):
-        """Add a message to conversation history"""
+        """Add a message to conversation history AND database"""
         history = self.get_conversation_history(date)
+
         if role == "user":
             history.append(HumanMessage(content=content))
         elif role == "assistant":
             history.append(AIMessage(content=content))
+
+            # Save to database
+        db.save_message(date, role, content)
 
     async def stream_response(self, message: str, date: str):
         """
