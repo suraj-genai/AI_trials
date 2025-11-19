@@ -1,72 +1,132 @@
-# core/ai_agent.py
-from langchain_community.chat_models import ChatOpenAI
-from langchain_core.callbacks.base import BaseCallbackHandler
-from langchain_core.callbacks.manager import CallbackManager
+# BackEnd/core/ai_agent.py
+from langchain_openai import ChatOpenAI
+from langchain.messages import HumanMessage, AIMessage, SystemMessage
 from core.config import (
     AI_PROVIDER,
     OPENAI_API_KEY, OPENAI_API_BASE, OPENAI_MODEL,
     ABACUS_API_KEY, ABACUS_API_BASE, ABACUS_MODEL
 )
 
+# System prompt for journaling assistant
+SYSTEM_PROMPT = """
+You are a warm, empathetic journaling assistant. 
+Help users reflect on their thoughts and feelings.
+Be supportive, ask thoughtful questions, and encourage self-discovery.
+Keep responses concise but meaningful.
+"""
 
-class StreamingController(BaseCallbackHandler):
-    """Handles streaming + interrupt control."""
+# In-memory conversation storage (keyed by date)
+conversation_memory = {}
+
+
+class JournalAgent:
+    """Singleton journal agent with persistent LLM"""
+
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
     def __init__(self):
-        self.buffer = ""
-        self.stop_flag = False
-        self.on_token = None
+        if self._initialized:
+            return
 
-    def on_llm_new_token(self, token: str, **kwargs):
-        if self.stop_flag:
-            raise GeneratorExit("Stopped by user.")
-        self.buffer += token
-        if self.on_token:
-            self.on_token(token)
+        # Initialize LLM once
+        if AI_PROVIDER.lower() == "openai":
+            self.llm = ChatOpenAI(
+                openai_api_key=OPENAI_API_KEY,
+                model=OPENAI_MODEL,
+                base_url=OPENAI_API_BASE,
+                streaming=True,
+                temperature=1,
+                timeout=30
+            )
+        elif AI_PROVIDER.lower() == "abacus":
+            self.llm = ChatOpenAI(
+                openai_api_key=ABACUS_API_KEY,
+                model=ABACUS_MODEL,
+                base_url=ABACUS_API_BASE,
+                streaming=True,
+                temperature=0.7,
+                timeout=30
+            )
+        else:
+            raise ValueError("Invalid AI provider in .env")
+
+        self._initialized = True
+        print(f"✅ JournalAgent initialized with {AI_PROVIDER} provider")
+
+    def get_conversation_history(self, date: str):
+        """Get conversation history for a specific date"""
+        if date not in conversation_memory:
+            conversation_memory[date] = [SystemMessage(content=SYSTEM_PROMPT)]
+        return conversation_memory[date]
+
+    def add_to_conversation(self, date: str, role: str, content: str):
+        """Add a message to conversation history"""
+        history = self.get_conversation_history(date)
+        if role == "user":
+            history.append(HumanMessage(content=content))
+        elif role == "assistant":
+            history.append(AIMessage(content=content))
+
+    async def stream_response(self, message: str, date: str):
+        """
+        Stream AI response token by token with conversation memory
+
+        Args:
+            message: User's message string
+            date: Date string (YYYY-MM-DD) to maintain separate conversations per day
+
+        Yields:
+            str: Individual tokens from the AI response
+        """
+        # Get conversation history for this date
+        history = self.get_conversation_history(date)
+
+        # Add user message to history
+        self.add_to_conversation(date, "user", message)
+
+        # Collect full response for adding to history later
+        full_response = ""
+
+        try:
+            # Stream directly from LLM with conversation history
+            async for chunk in self.llm.astream(history):
+                if chunk.content:
+                    full_response += chunk.content
+                    yield chunk.content
+
+            # Add AI response to conversation history
+            self.add_to_conversation(date, "assistant", full_response)
+
+        except Exception as e:
+            print(f"Error in stream_response: {e}")
+            error_msg = f"\n\n[Error: {str(e)}]"
+            full_response += error_msg
+            yield error_msg
+            if full_response.strip():
+                self.add_to_conversation(date, "assistant", full_response)
+
+    def clear_conversation(self, date: str):
+        """Clear conversation history for a specific date"""
+        if date in conversation_memory:
+            del conversation_memory[date]
+
+    def get_all_messages(self, date: str):
+        """Get all messages for a date (for loading previous conversations)"""
+        history = self.get_conversation_history(date)
+        messages = []
+        for msg in history:
+            if isinstance(msg, HumanMessage):
+                messages.append({"role": "user", "content": msg.content})
+            elif isinstance(msg, AIMessage):
+                messages.append({"role": "assistant", "content": msg.content})
+        return messages
 
 
-controller = StreamingController()
-
-
-def get_llm():
-    """Factory to get configured LLM based on provider."""
-    if AI_PROVIDER.lower() == "openai":
-        return ChatOpenAI(
-            openai_api_key=OPENAI_API_KEY,
-            model=OPENAI_MODEL,
-            base_url=OPENAI_API_BASE,
-            streaming=True,
-            temperature=1,
-            timeout=30
-          #  model_kwargs={"callback_manager":CallbackManager([controller])}
-        )
-
-    elif AI_PROVIDER.lower() == "abacus":
-        return ChatOpenAI(
-            openai_api_key=ABACUS_API_KEY,
-            model=ABACUS_MODEL,
-            base_url=ABACUS_API_BASE,
-            streaming=True,
-            temperature=0.7,
-            timeout=30
-           # model_kwargs={"callback_manager":CallbackManager([controller])}
-        )
-
-    else:
-        raise ValueError("Invalid AI provider in .env")
-
-
-def stream_ai_response(prompt: str):
-    """Generator to stream AI response."""
-    llm = get_llm()
-    controller.stop_flag = False
-
-    try:
-        for chunk in llm.stream(prompt):
-            if chunk and chunk.content:
-                safe_chunk = chunk.content #.replace("\n", "\\n").replace("\r", "")
-                yield safe_chunk
-        yield "[END]\n\n"
-    except GeneratorExit:
-        yield "\n\n[Generation stopped by user]\n"
-    except Exception as e:
-        yield f"\n\n[Error: {str(e)}]\n"
+# Create singleton instance at module load
+agent = JournalAgent()
