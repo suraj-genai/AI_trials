@@ -12,8 +12,8 @@ AI_PROVIDER = "abacus"  #os.getenv("AI_PROVIDER", "openai")
 # Abacus
 ABACUS_API_KEY = os.getenv("ABACUS_API_KEY", "")
 ABACUS_API_BASE = os.getenv("ABACUS_API_BASE", "https://routellm.abacus.ai/v1")
-ABACUS_MODEL = os.getenv("ABACUS_MODEL", "route-llm")
-
+ABACUS_MODEL = os.getenv("ABACUS_MODEL", "gpt-5 mini")
+print("ABACUS MODEL = ", ABACUS_MODEL)
 llm = ChatOpenAI(
     openai_api_key=ABACUS_API_KEY,
     model=ABACUS_MODEL,
@@ -32,15 +32,15 @@ print("Agent1 initialized")
 
 async def AI_stream_message(agent, message):
     count = 0
-    async for content in agent.astream_events(message,
-                                              version="v2"):
+    async for content in agent.astream(message):
         count += 1
-        if content["event"] == "on_chat_model_stream":
-            print(count, content['event'], ": ",content["data"]["chunk"].content)
-        elif content["event"] == "on_chain_start":
-            print(count, content)
-        else:
-            print(count, content['event'])
+        print(count, content)
+        # if content["event"] == "on_chat_model_stream":
+        #     print(count, content['event'], ": ",content["data"]["chunk"])
+        # elif content["event"] == "on_chain_start":
+        #     print(count, content)
+        # else:
+        #     print(count, content['event'])
 
 prompt = HumanMessage("Explain python programming in less than 200 words.")
 print("Transmitting the message1")

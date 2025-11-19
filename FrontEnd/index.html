@@ -10,6 +10,16 @@
     body {
       background: url('https://images.unsplash.com/photo-1518676590629-3c552b2dd2ad?ixlib=rb-4.0.3&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1920') center/cover fixed;
     }
+      /* Markdown styling for AI responses */
+    .markdown-content p { margin-bottom: 0.75rem; }
+    .markdown-content br { display: block; margin-bottom: 0.5rem; }
+    .markdown-content ul, .markdown-content ol { margin-left: 1.5rem; margin-bottom: 0.75rem; }
+    .markdown-content li { margin-bottom: 0.25rem; }
+    .markdown-content code { background: #f3f4f6; padding: 0.125rem 0.25rem; border-radius: 0.25rem; font-size: 0.875rem; }
+    .markdown-content pre { background: #f3f4f6; padding: 0.75rem; border-radius: 0.5rem; overflow-x: auto; margin-bottom: 0.75rem; }
+    .markdown-content strong { font-weight: 600; }
+    .markdown-content em { font-style: italic; }
+    .markdown-content h1, .markdown-content h2, .markdown-content h3 { font-weight: 600; margin-top: 0.75rem; margin-bottom: 0.5rem; }
   </style>
 </head>
 <body class="h-full flex flex-col">
@@ -60,6 +70,14 @@
   </div>
 
   <script>
+    const converter = new showdown.Converter({
+      simpleLineBreaks: true,
+      breaks: true,
+      openLinksInNewWindow: true,
+      strikethrough: true,
+      tables: true
+    });
+
     const messages = document.getElementById('messages');
     const input = document.getElementById('input');
     const send = document.getElementById('send');
@@ -79,8 +97,12 @@
       const bubble = document.createElement('div');
       bubble.className = isUser 
         ? 'bg-amber-700 text-white px-4 py-3 rounded-l-lg rounded-tr-lg max-w-lg shadow'
-        : 'bg-white text-amber-900 px-4 py-3 rounded-r-lg rounded-tl-lg max-w-lg shadow border';
-      bubble.textContent = text;
+        : 'bg-white text-amber-900 px-4 py-3 rounded-r-lg rounded-tl-lg max-w-lg shadow border markdown-content';
+      if (isUser) {
+        bubble.textContent = text;
+      } else {
+        bubble.innerHTML = converter.makeHtml(text);
+      }
       div.appendChild(bubble);
       messages.appendChild(div);
       messages.scrollTop = messages.scrollHeight;
@@ -91,8 +113,9 @@
       const div = document.createElement('div');
       div.className = 'flex justify-start';
       const bubble = document.createElement('div');
-      bubble.className = 'bg-white text-amber-900 px-4 py-3 rounded-r-lg rounded-tl-lg max-w-lg shadow border';
+      bubble.className = 'bg-white text-amber-900 px-4 py-3 rounded-r-lg rounded-tl-lg max-w-lg shadow border markdown-content';
       bubble.id = 'streaming-message';
+      bubble.setAttribute('data-raw-content', ''); // Store raw markdown
       bubble.textContent = '';
       div.appendChild(bubble);
       messages.appendChild(div);
@@ -139,30 +162,43 @@
         const decoder = new TextDecoder();
         const streamingBubble = addStreamingMessage();
         let buffer = '';
+        let rawContent = '';
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           
           buffer += decoder.decode(value,{ stream: true });
-          const lines = buffer.split('\n');
+          const lines = buffer.split('\n\n');
 
           // NEW: Keep last incomplete line in buffer
           buffer = lines.pop() || '';
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
-              const content = line.slice(6);
-              // NEW: Handle done signal
-              if (content === '[DONE]') {
-                break;
-              }
-              if (content != '') {
-                streamingBubble.textContent += content;
+              const jsonStr = line.slice(6);
+              console.log('[Frontend] Received JSON String : ',jsonStr);
+              try {
+                const content = JSON.parse(jsonStr);
+                console.log('[Frontend] Parsed data:', content);
+
+                // NEW: Handle done signal
+                if (content.done) {
+                  break;
+                }
+
+                rawContent += content;
+                // Update raw content attribute
+                streamingBubble.setAttribute('data-raw-content', rawContent);
+                // Render markdown in real-time
+                streamingBubble.textContent = rawContent;
                 messages.scrollTop = messages.scrollHeight;
+              } catch (e) {
+              console.error('Error parsing JSON:', e, jsonStr);
               }
             }
           }
         }
+        streamingBubble.innerHTML = converter.makeHtml(rawContent);
         streamingBubble.id = ''; // Remove streaming ID after completion
       } catch (error) {
         console.error('Error sending message:', error);

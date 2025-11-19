@@ -13,4 +13,4 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5")
 # Abacus
 ABACUS_API_KEY = os.getenv("ABACUS_API_KEY", "")
 ABACUS_API_BASE = os.getenv("ABACUS_API_BASE", "https://routellm.abacus.ai/v1")
-ABACUS_MODEL = os.getenv("ABACUS_MODEL", "route-llm")
+ABACUS_MODEL = os.getenv("ABACUS_MODEL", "gpt-5 mini")

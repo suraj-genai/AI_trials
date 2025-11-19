@@ -96,10 +96,11 @@ class JournalAgent:
         try:
             # Stream directly from LLM with conversation history
             async for chunk in self.llm.astream(history):
+                print(chunk)
                 if chunk.content:
                     full_response += chunk.content
                     yield chunk.content
-
+            print("Full Response = ",full_response)
             # Add AI response to conversation history
             self.add_to_conversation(date, "assistant", full_response)
 
