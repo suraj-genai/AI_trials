@@ -7,8 +7,8 @@ import os
 app = Flask(__name__)
 
 # Register routes
-app.register_blueprint(chat_bp)
-app.register_blueprint(health_bp)
+app.register_blueprint(chat_bp, url_prefix='/api')
+app.register_blueprint(health_bp, url_prefix='/api')
 # Serve Frontend (index.html)
 @app.route("/")
 def serve_frontend():
