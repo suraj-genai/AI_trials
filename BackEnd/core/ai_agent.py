@@ -6,7 +6,7 @@ from core.config import (
     OPENAI_API_KEY, OPENAI_API_BASE, OPENAI_MODEL,
     ABACUS_API_KEY, ABACUS_API_BASE, ABACUS_MODEL
 )
-from core.database import db
+
 # System prompt for journaling assistant
 SYSTEM_PROMPT = """
 You are a warm, empathetic journaling assistant. 
@@ -14,10 +14,6 @@ Help users reflect on their thoughts and feelings.
 Be supportive, ask thoughtful questions, and encourage self-discovery.
 Keep responses concise but meaningful.
 """
-
-# In-memory conversation storage (keyed by date)
-conversation_memory = {}
-
 
 class JournalAgent:
     """Singleton journal agent with persistent LLM"""
@@ -59,89 +55,47 @@ class JournalAgent:
         self._initialized = True
         print(f"✅ JournalAgent initialized with {AI_PROVIDER} provider")
 
-    def get_conversation_history(self, date: str):
-        """Get conversation history for a specific date from database"""
-        if date not in conversation_memory:
-            # Load from database
-            messages_from_db = db.get_messages(date)
-
-            # Convert to LangChain message format
-            conversation_memory[date] = [SystemMessage(content=SYSTEM_PROMPT)]
-
-            for msg in messages_from_db:
-                if msg['role'] == 'user':
-                    conversation_memory[date].append(HumanMessage(content=msg['content']))
-                elif msg['role'] == 'assistant':
-                    conversation_memory[date].append(AIMessage(content=msg['content']))
-
-        return conversation_memory[date]
-
-    def add_to_conversation(self, date: str, role: str, content: str):
-        """Add a message to conversation history AND database"""
-        history = self.get_conversation_history(date)
-
-        if role == "user":
-            history.append(HumanMessage(content=content))
-        elif role == "assistant":
-            history.append(AIMessage(content=content))
-
-            # Save to database
-        db.save_message(date, role, content)
-
-    async def stream_response(self, message: str, date: str):
+    def stream_response(self, message, conversation_history):
         """
-        Stream AI response token by token with conversation memory
+        Stream AI response given message and history
 
         Args:
-            message: User's message string
-            date: Date string (YYYY-MM-DD) to maintain separate conversations per day
+            message (str): User's current message
+            conversation_history (list): List of {role, content} dicts
 
         Yields:
-            str: Individual tokens from the AI response
+            str: Chunks of AI response
         """
-        # Get conversation history for this date
-        history = self.get_conversation_history(date)
+        # Convert history to LangChain format
+        messages = []
 
-        # Add user message to history
-        self.add_to_conversation(date, "user", message)
+        # System prompt
+        system_prompt = """You are a thoughtful journaling companion.   
+        Help users reflect on their day, identify patterns, and gain insights.  
+        Ask meaningful questions. Be empathetic and supportive."""
 
-        # Collect full response for adding to history later
-        full_response = ""
+        messages.append(HumanMessage(content=f"System: {system_prompt}"))
 
+        # Add conversation history
+        for msg in conversation_history:
+            if msg['role'] == 'user':
+                messages.append(HumanMessage(content=msg['content']))
+            elif msg['role'] == 'assistant':
+                messages.append(AIMessage(content=msg['content']))
+
+                # Add current message
+        messages.append(HumanMessage(content=message))
         try:
-            # Stream directly from LLM with conversation history
-            async for chunk in self.llm.astream(history):
-                print(chunk)
-                if chunk.content:
-                    full_response += chunk.content
+            # Stream response
+            for chunk in self.llm.stream(messages):
+                if hasattr(chunk, 'content'):
                     yield chunk.content
-            print("Full Response = ",full_response)
-            # Add AI response to conversation history
-            self.add_to_conversation(date, "assistant", full_response)
 
         except Exception as e:
             print(f"Error in stream_response: {e}")
             error_msg = f"\n\n[Error: {str(e)}]"
-            full_response += error_msg
             yield error_msg
-            if full_response.strip():
-                self.add_to_conversation(date, "assistant", full_response)
 
-    def clear_conversation(self, date: str):
-        """Clear conversation history for a specific date"""
-        if date in conversation_memory:
-            del conversation_memory[date]
-
-    def get_all_messages(self, date: str):
-        """Get all messages for a date (for loading previous conversations)"""
-        history = self.get_conversation_history(date)
-        messages = []
-        for msg in history:
-            if isinstance(msg, HumanMessage):
-                messages.append({"role": "user", "content": msg.content})
-            elif isinstance(msg, AIMessage):
-                messages.append({"role": "assistant", "content": msg.content})
-        return messages
 
 
 # Create singleton instance at module load
