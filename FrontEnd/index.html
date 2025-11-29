@@ -2,206 +2,166 @@
 <html lang="en" class="h-full">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Memory Grove Journal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Memory Grove - AI Journal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js"></script>
-  <style>
-    body {
-      background: url('https://images.unsplash.com/photo-1518676590629-3c552b2dd2ad?ixlib=rb-4.0.3&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1920') center/cover fixed;
-    }
-    /* Markdown styling for AI responses */
-    .markdown-content p { margin-bottom: 0.75rem; }
-    .markdown-content br { display: block; margin-bottom: 0.5rem; }
-    .markdown-content ul, .markdown-content ol { margin-left: 1.5rem; margin-bottom: 0.75rem; }
-    .markdown-content li { margin-bottom: 0.25rem; }
-    .markdown-content code { background: #f3f4f6; padding: 0.125rem 0.25rem; border-radius: 0.25rem; font-size: 0.875rem; }
-    .markdown-content pre { background: #f3f4f6; padding: 0.75rem; border-radius: 0.5rem; overflow-x: auto; margin-bottom: 0.75rem; }
-    .markdown-content strong { font-weight: 600; }
-    .markdown-content em { font-style: italic; }
-    .markdown-content h1, .markdown-content h2, .markdown-content h3 { font-weight: 600; margin-top: 0.75rem; margin-bottom: 0.5rem; }
-
-    /* Notification styles */
-    .notification {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: #92400e;
-      color: white;
-      padding: 15px 25px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      z-index: 10000;
-      animation: slideIn 0.3s ease-out;
-      font-weight: 500;
-    }
-    /* Modal styles (add to <style> section) */
-    .modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.6);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      animation: fadeIn 0.3s ease-out;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-
-    .modal-content {
-      background: white;
-      padding: 40px;
-      border-radius: 16px;
-      max-width: 500px;
-      width: 90%;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-      text-align: center;
-      animation: scaleIn 0.3s ease-out;
-    }
-
-    @keyframes scaleIn {
-      from {
-        transform: scale(0.9);
-        opacity: 0;
-      }
-      to {
-        transform: scale(1);
-        opacity: 1;
-      }
-    }
-
-    .modal-content h2 {
-      margin-top: 0;
-      margin-bottom: 20px;
-      color: #78350f;
-      font-size: 24px;
-    }
-
-    .modal-content p {
-      margin-bottom: 15px;
-      color: #555;
-      line-height: 1.6;
-    }
-
-    .modal-content p.small {
-      font-size: 14px;
-      color: #888;
-      margin-bottom: 25px;
-    }
-
-    .modal-content button {
-      margin: 10px;
-      padding: 12px 30px;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      font-weight: 500;
-    }
-
-    .btn-primary {
-      background: #92400e;
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background: #78350f;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(146, 64, 14, 0.3);
-    }
-
-    .btn-secondary {
-      background: #e0e0e0;
-      color: #555;
-    }
-
-    .btn-secondary:hover {
-      background: #d0d0d0;
-    }
-    @keyframes slideIn {
-      from {
-        transform: translateX(400px);
-        opacity: 0;
-      }
-      to {
-        transform: translateX(0);
-        opacity: 1;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="css/styles.css">
 </head>
-<body class="h-full flex flex-col">
-  <!-- Toolbar -->
-  <div class="flex items-center gap-3 px-4 py-3 bg-white bg-opacity-95 border-b-2 border-amber-700">
-    <button id="export-btn" class="px-4 py-2 bg-white border border-amber-600 text-amber-900 rounded-lg hover:bg-amber-50 transition" title="Export backup">
-      📥 Export
-    </button>
-    <button id="import-btn" class="px-4 py-2 bg-white border border-amber-600 text-amber-900 rounded-lg hover:bg-amber-50 transition" title="Import backup">
-      📤 Import
-    </button>
+<body class="h-full overflow-hidden">
 
-    <div class="flex-1"></div>
-
-    <div class="flex items-center gap-2 text-sm text-amber-800">
-      <span class="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
-      <span id="sync-status">Ready</span>
-    </div>
-
-    <button id="finish-entry-btn" class="px-4 py-2 bg-amber-700 text-white rounded-lg hover:bg-amber-800 transition font-semibold" title="Finish and save entry">
-      ✅ Finish Entry
-    </button>
-  </div>
-
-  <div class="flex-1 flex max-w-screen-xl mx-auto w-full">
-    <!-- Left Sidebar -->
-    <div class="w-1/4 p-4 overflow-y-auto bg-white bg-opacity-95">
-      <h2 class="text-2xl font-bold text-amber-900 mb-3">Journal Dates</h2>
-
-      <!-- Calendar -->
-      <div class="bg-white p-4 rounded-lg shadow-md border border-amber-200">
-        <div class="grid grid-cols-7 gap-1 text-center text-sm font-medium text-amber-800 mb-2">
-          <div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div>
-        </div>
-        <div id="calendar" class="grid grid-cols-7 gap-1 text-center text-sm">
-          <div class="text-gray-400">27</div><div class="text-gray-400">28</div><div class="text-gray-400">29</div><div class="text-gray-400">30</div><div class="text-gray-400">31</div><div>1</div><div>2</div>
-          <div>3</div><div>4</div><div>5</div><div class="bg-amber-700 text-white rounded-full w-8 h-8 leading-8 mx-auto">6</div><div>7</div><div>8</div><div>9</div>
-          <div class="bg-amber-700 text-white rounded-full w-8 h-8 leading-8 mx-auto">10</div><div>11</div><div>12</div><div>13</div><div>14</div><div>15</div><div>16</div>
-          <div>17</div><div class="bg-amber-600 text-white rounded-full w-8 h-8 leading-8 mx-auto font-bold">18</div><div>19</div><div>20</div><div>21</div><div>22</div>
-        </div>
-      </div>
-
-      <!-- Today's Entry button -->
-      <button id="today" class="mt-4 w-full bg-amber-100 hover:bg-amber-200 text-amber-900 px-4 py-3 rounded-lg font-semibold border-2 border-amber-600">
-        Today's Entry →
-      </button>
-
-      <div class="mt-6 text-center">
-        <img src="https://images.unsplash.com/photo-1518676590629-3c552b2dd2ad?ixlib=rb-4.0.3&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=300" alt="Leather journal" class="rounded-lg shadow mx-auto w-32">
-        <p class="text-xs text-amber-700 mt-2">Your private thoughts,<br>forever remembered.</p>
+  <!-- Header (Fixed) -->
+  <header class="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-amber-800 to-amber-600 text-white shadow-lg">
+    <div class="px-4 py-3 flex items-center justify-between">
+      <h1 class="text-xl md:text-2xl font-bold">🌳 Memory Grove</h1>
+      <div class="flex items-center gap-2">
+        <button id="export-btn" class="px-3 py-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg text-sm transition" title="Export backup">
+          📥 <span class="hidden sm:inline">Export</span>
+        </button>
+        <button id="import-btn" class="px-3 py-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg text-sm transition" title="Import backup">
+          📤 <span class="hidden sm:inline">Import</span>
+        </button>
+        <button id="settings-btn" class="px-3 py-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg text-sm transition" title="Settings">
+          ⚙️
+        </button>
       </div>
     </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="flex h-full pt-14">
+
+    <!-- Left Sidebar (Fixed) -->
+    <aside class="hidden md:flex md:w-80 flex-col bg-white border-r border-amber-200 overflow-hidden">
+
+      <!-- Calendar Section (Scrollable) -->
+      <div class="flex-1 overflow-y-auto p-4">
+        <h2 class="text-xl font-bold text-amber-900 mb-4">Journal Dates</h2>
+
+        <!-- Calendar -->
+        <div class="bg-amber-50 p-4 rounded-lg shadow-md border border-amber-200 mb-4">
+          <div class="flex justify-between items-center mb-3">
+            <button id="prev-month" class="text-amber-700 hover:text-amber-900 font-bold text-xl"><</button>
+            <h3 id="current-month" class="text-lg font-semibold text-amber-900">November 2025</h3>
+            <button id="next-month" class="text-amber-700 hover:text-amber-900 font-bold text-xl">></button>
+          </div>
+
+          <div class="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-amber-800 mb-2">
+            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+          </div>
+
+          <div id="calendar" class="grid grid-cols-7 gap-1 text-center text-sm">
+            <!-- Calendar will be generated by JavaScript -->
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <button id="today-btn" class="w-full bg-amber-600 hover:bg-amber-700 text-white px-4 py-3 rounded-lg font-semibold mb-2 transition">
+          📅 Today's Entry
+        </button>
+
+        <button id="make-entry-btn" class="w-full bg-amber-100 hover:bg-amber-200 text-amber-900 px-4 py-3 rounded-lg font-semibold border-2 border-amber-600 mb-2 transition" disabled>
+          ✏️ Make Entry
+        </button>
+
+        <button id="delete-entry-btn" class="w-full bg-red-100 hover:bg-red-200 text-red-900 px-4 py-3 rounded-lg font-semibold border-2 border-red-600 transition" disabled>
+          🗑️ Delete Entry
+        </button>
+
+        <div class="mt-6 text-center">
+          <p class="text-xs text-amber-700 italic">Your private thoughts,<br>forever remembered.</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Mobile Calendar Toggle -->
+    <button id="mobile-calendar-toggle" class="md:hidden fixed bottom-20 left-4 z-40 bg-amber-600 text-white p-3 rounded-full shadow-lg">
+      📅
+    </button>
 
     <!-- Right Chat Area -->
-    <div class="w-3/4 flex flex-col">
-      <div id="messages" class="flex-1 overflow-y-auto p-6 space-y-6">
-        <!-- Messages will be loaded here by app.js -->
-      </div>
+    <main class="flex-1 flex flex-col overflow-hidden">
 
-      <!-- Input bar -->
-      <div class="p-4 bg-white bg-opacity-95 border-t-2 border-amber-700">
-        <div class="flex gap-2 max-w-4xl mx-auto">
-          <textarea id="input" rows="1" class="flex-1 resize-none rounded-lg border border-amber-600 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-700" placeholder="Write in your journal... Press Enter to send"></textarea>
-          <button id="send" class="bg-amber-700 hover:bg-amber-800 text-white px-6 py-2 rounded-lg font-semibold">Send</button>
+      <!-- Messages Area (Scrollable) -->
+      <div id="messages" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-gradient-to-b from-amber-50 to-white">
+        <!-- Welcome message -->
+        <div class="text-center py-8 text-amber-700">
+          <h2 class="text-2xl font-bold mb-2">Welcome to Memory Grove 🌳</h2>
+          <p class="text-sm">Your AI-powered journaling companion</p>
         </div>
       </div>
+
+      <!-- Input Area (Fixed) -->
+      <footer class="border-t-2 border-amber-700 bg-white p-3 md:p-4">
+        <div class="max-w-4xl mx-auto">
+          <div class="flex gap-2 items-end">
+            <textarea
+              id="input"
+              rows="1"
+              class="flex-1 resize-none rounded-lg border-2 border-amber-600 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-700 max-h-32 overflow-y-auto"
+              placeholder="Write in your journal..."></textarea>
+
+            <div class="flex flex-col gap-2">
+              <button id="send" class="bg-amber-700 hover:bg-amber-800 text-white px-6 py-3 rounded-lg font-semibold transition whitespace-nowrap">
+                🔍 Analyze
+              </button>
+              <button id="finish-entry-btn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-semibold transition text-sm whitespace-nowrap">
+                ✅ Finish
+              </button>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Settings Modal (Reserved for future use) -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>⚙️ Settings</h2>
+      <div class="text-left mb-4">
+        <p class="text-sm text-gray-600">Settings will be available in a future update.</p>
+      </div>
+      <div class="flex gap-2 justify-center mt-6">
+        <button id="close-settings-btn" class="btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Calendar Modal -->
+  <div id="mobile-calendar-modal" class="modal hidden md:hidden">
+    <div class="modal-content max-w-sm">
+      <h2>📅 Calendar</h2>
+
+      <div class="bg-amber-50 p-4 rounded-lg mb-4">
+        <div class="flex justify-between items-center mb-3">
+          <button id="mobile-prev-month" class="text-amber-700 hover:text-amber-900 font-bold text-xl"><</button>
+          <h3 id="mobile-current-month" class="text-lg font-semibold text-amber-900">November 2025</h3>
+          <button id="mobile-next-month" class="text-amber-700 hover:text-amber-900 font-bold text-xl">></button>
+        </div>
+
+        <div class="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-amber-800 mb-2">
+          <div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div>
+        </div>
+
+        <div id="mobile-calendar" class="grid grid-cols-7 gap-1 text-center text-sm">
+          <!-- Calendar will be generated by JavaScript -->
+        </div>
+      </div>
+
+      <button id="mobile-today-btn" class="w-full bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-semibold mb-2">
+        Today's Entry
+      </button>
+
+      <button id="mobile-make-entry-btn" class="w-full bg-amber-100 hover:bg-amber-200 text-amber-900 px-4 py-2 rounded-lg font-semibold border-2 border-amber-600 mb-2" disabled>
+        Make Entry
+      </button>
+
+      <button id="mobile-delete-entry-btn" class="w-full bg-red-100 hover:bg-red-200 text-red-900 px-4 py-2 rounded-lg font-semibold border-2 border-red-600 mb-4" disabled>
+        Delete Entry
+      </button>
+
+      <button id="close-mobile-calendar" class="btn-secondary w-full">Close</button>
     </div>
   </div>
 
