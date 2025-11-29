@@ -1,6 +1,4 @@
-# All purpose personal AI Assistant
+# AI Journal with 100 % local data storage
+This is a basic AI App which can be used to create journals and make entries for each day. This is a basic demo app to show for local apps can work with AI and have a good memory. 
 
-This project is a baseline function for a basic chatbot with a database attachment and a RAG mechanism which would be there 
-to understand the user's needs and preferences. The final product is expected to be an AI which can selectively recollect all
-the data related to the context under review. 
 
