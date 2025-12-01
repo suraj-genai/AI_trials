@@ -34,7 +34,6 @@ async function initApp() {
     await syncHistoryOnLoad();
   } catch (error) {
     console.error('Failed to sync history on load:', error);
-    // Continue even if sync fails
   }
 
   // Load today's conversation
@@ -65,7 +64,7 @@ function setupEventListeners() {
   // Message input
   const sendBtn = document.getElementById('send');
   const input = document.getElementById('input');
-  
+
   if (sendBtn) sendBtn.addEventListener('click', handleSendMessage);
   if (input) {
     input.addEventListener('keypress', (e) => {
@@ -115,7 +114,7 @@ function setupEventListeners() {
   const nextMonth = document.getElementById('next-month');
   const mobilePrevMonth = document.getElementById('mobile-prev-month');
   const mobileNextMonth = document.getElementById('mobile-next-month');
-  
+
   if (prevMonth) prevMonth.addEventListener('click', () => navigateMonth(-1));
   if (nextMonth) nextMonth.addEventListener('click', () => navigateMonth(1));
   if (mobilePrevMonth) mobilePrevMonth.addEventListener('click', () => navigateMonth(-1));
@@ -173,10 +172,10 @@ function setupEventListeners() {
 function updateCalendarDisplay() {
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
-  
+
   const currentMonthEl = document.getElementById('current-month');
   const mobileCurrentMonthEl = document.getElementById('mobile-current-month');
-  
+
   if (currentMonthEl) {
     currentMonthEl.textContent = `${monthNames[currentMonth]} ${currentYear}`;
   }
@@ -201,7 +200,7 @@ function navigateMonth(direction) {
 async function updateCalendar() {
   const calendarEl = document.getElementById('calendar');
   const mobileCalendarEl = document.getElementById('mobile-calendar');
-  
+
   if (!calendarEl && !mobileCalendarEl) return;
 
   const firstDay = new Date(currentYear, currentMonth, 1).getDay();
@@ -210,19 +209,18 @@ async function updateCalendar() {
   const isCurrentMonth = today.getMonth() === currentMonth && today.getFullYear() === currentYear;
   const todayDate = today.getDate();
 
-  // Get all conversations to mark dates
   const conversations = await getAllConversations();
   const conversationDates = new Set(conversations.map(c => c.date));
 
   const generateCalendarHTML = () => {
     let html = '';
-    
-    // Empty cells for days before month starts
+
+    // Empty cells
     for (let i = 0; i < firstDay; i++) {
       html += '<div class="text-gray-400"></div>';
     }
 
-    // Days of the month
+    // Days
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const isToday = isCurrentMonth && day === todayDate;
@@ -231,7 +229,7 @@ async function updateCalendar() {
       const isCurrentDate = currentDate === dateStr;
 
       let classes = 'cursor-pointer hover:bg-amber-100 rounded-full w-8 h-8 leading-8 mx-auto transition';
-      
+
       if (isToday) {
         classes += ' bg-amber-600 text-white font-bold';
       } else if (isSelected || isCurrentDate) {
@@ -250,7 +248,6 @@ async function updateCalendar() {
 
   if (calendarEl) {
     calendarEl.innerHTML = generateCalendarHTML();
-    // Add click listeners
     calendarEl.querySelectorAll('[data-date]').forEach(el => {
       el.addEventListener('click', () => {
         const date = el.getAttribute('data-date');
@@ -265,7 +262,6 @@ async function updateCalendar() {
 
   if (mobileCalendarEl) {
     mobileCalendarEl.innerHTML = generateCalendarHTML();
-    // Add click listeners
     mobileCalendarEl.querySelectorAll('[data-date]').forEach(el => {
       el.addEventListener('click', () => {
         const date = el.getAttribute('data-date');
@@ -288,7 +284,7 @@ function updateButtonStates() {
 
   getConversation(currentDate).then(conv => {
     const hasEntry = conv !== undefined && conv !== null;
-    
+
     if (makeEntryBtn) makeEntryBtn.disabled = hasEntry;
     if (mobileMakeEntryBtn) mobileMakeEntryBtn.disabled = hasEntry;
     if (deleteEntryBtn) deleteEntryBtn.disabled = !hasEntry;
@@ -304,7 +300,7 @@ function openMobileCalendar() {
   const modal = document.getElementById('mobile-calendar-modal');
   if (modal) {
     modal.classList.remove('hidden');
-    updateCalendar(); // Refresh calendar in modal
+    updateCalendar();
   }
 }
 
@@ -341,25 +337,22 @@ async function handleSendMessage() {
 
   const history = await getMessages(currentDate);
 
-  // --- NEW LOGIC START ---
-  // Fetch the most recent summary (Long Term Memory)
+  // Get Long Term Memory
   const allSummaries = await getAllSummaries();
-  // Sort by date descending (newest first)
   allSummaries.sort((a, b) => new Date(b.Date) - new Date(a.Date));
-
   let context = "";
   if (allSummaries.length > 0) {
-    // We use the MOST RECENT summary as context
     context = allSummaries[0].Summary;
   }
-  // --- NEW LOGIC END ---
 
   isStreaming = true;
   let aiResponse = '';
-  const aiMessageElement = createMessageElement('assistant', '');
+
+  // Show Loading Animation
+  const aiMessageElement = createMessageElement('assistant', '...');
+  aiMessageElement.innerHTML = getLoadingHTML();
 
   try {
-    // Pass context to API
     const reader = await sendMessageToAI(message, history, currentDate, context);
 
     for await (const chunk of streamResponse(reader)) {
@@ -381,37 +374,70 @@ async function handleSendMessage() {
 }
 
 async function loadConversation(date) {
-  // Check if conversation exists
   let conversation = await getConversation(date);
 
   if (!conversation) {
     conversation = await createConversation(date);
   }
 
-  // Load messages
   const messages = await getMessages(date);
-
-  // Display messages
   const messagesContainer = document.getElementById('messages');
   if (!messagesContainer) return;
 
   messagesContainer.innerHTML = '';
 
   if (messages.length === 0) {
-    displayMessage('assistant', "Welcome to your journal. What's on your mind today?");
+    // If no messages today, trigger the AI Greeting
+    await triggerAIGreeting(date);
   } else {
     for (const msg of messages) {
       displayMessage(msg.role, msg.content);
     }
   }
 
-  // Update button states
   updateButtonStates();
-  
-  // Scroll to bottom
+
   setTimeout(() => {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }, 100);
+}
+
+async function triggerAIGreeting(date) {
+  if (isStreaming) return;
+  isStreaming = true;
+
+  // Get Context
+  const allSummaries = await getAllSummaries();
+  allSummaries.sort((a, b) => new Date(b.Date) - new Date(a.Date));
+  const context = allSummaries.length > 0 ? allSummaries[0].Summary : "";
+
+  // Show Loading
+  const aiMessageElement = createMessageElement('assistant', '...');
+  aiMessageElement.innerHTML = getLoadingHTML();
+
+  let aiResponse = '';
+
+  try {
+    // Send Hidden Trigger
+    const reader = await sendMessageToAI("[SYSTEM_TRIGGER_GREETING]", [], date, context);
+
+    for await (const chunk of streamResponse(reader)) {
+      aiResponse += chunk;
+      updateMessageContent(aiMessageElement, aiResponse);
+      const messagesContainer = document.getElementById('messages');
+      if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    // Save AI greeting (user trigger is NOT saved)
+    await saveMessage(date, 'assistant', aiResponse);
+
+  } catch (error) {
+    console.error('Greeting error:', error);
+    updateMessageContent(aiMessageElement, "Hello! I'm ready to listen.");
+    await saveMessage(date, 'assistant', "Hello! I'm ready to listen.");
+  } finally {
+    isStreaming = false;
+  }
 }
 
 // ========================================
@@ -424,11 +450,10 @@ async function handleMakeEntry() {
   } else {
     currentDate = getTodaysDate();
   }
-  
+
   await loadConversation(currentDate);
   updateButtonStates();
-  
-  // Focus on input
+
   const input = document.getElementById('input');
   if (input) input.focus();
 }
@@ -439,23 +464,17 @@ async function handleDeleteEntry() {
   }
 
   try {
-    // Delete all messages for this date
     await deleteMessagesByDate(currentDate);
-    
-    // Delete conversation
     await deleteConversation(currentDate);
-    
-    // Delete summary if exists
     await deleteSummary(currentDate);
 
-    // Clear the messages container
     const messagesContainer = document.getElementById('messages');
     if (messagesContainer) {
       messagesContainer.innerHTML = '';
-      displayMessage('assistant', "Entry deleted. Start a new entry whenever you're ready.");
+      // Trigger new greeting after deletion
+      triggerAIGreeting(currentDate);
     }
 
-    // Refresh calendar and button states
     updateCalendar();
     updateButtonStates();
     showNotification('✅ Entry deleted successfully');
@@ -477,12 +496,6 @@ function displayMessage(role, content) {
   }
 }
 
-/**
- * Create a message element with proper formatting
- * @param {string} role - 'user' or 'assistant'
- * @param {string} content - Message content
- * @returns {HTMLElement} The message bubble element
- */
 function createMessageElement(role, content) {
   const div = document.createElement('div');
   div.className = role === 'user' ? 'flex justify-end mb-4' : 'flex justify-start mb-4';
@@ -493,10 +506,8 @@ function createMessageElement(role, content) {
     : 'bg-white text-amber-900 px-4 py-3 rounded-r-lg rounded-tl-lg max-w-lg shadow border markdown-content';
 
   if (role === 'user') {
-    // For user messages: preserve formatting (newlines, spacing) but don't render markdown
     bubble.innerHTML = formatUserMessage(content || '...');
   } else {
-    // For assistant messages: render markdown
     bubble.innerHTML = converter.makeHtml(content || '...');
   }
 
@@ -509,45 +520,39 @@ function createMessageElement(role, content) {
   return bubble;
 }
 
-/**
- * Format user message to preserve newlines and spacing
- * Converts newlines to <br> and preserves spacing
- * @param {string} text - Raw text input
- * @returns {string} HTML formatted text
- */
 function formatUserMessage(text) {
   if (!text) return '';
-  
-  // Escape HTML to prevent XSS
+
   const escaped = text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-  
-  // Convert newlines to <br>
+
   return escaped.replace(/\n/g, '<br>');
 }
 
-/**
- * Update message content with proper formatting
- * @param {HTMLElement} element - The message bubble element
- * @param {string} content - New content to display
- */
 function updateMessageContent(element, content) {
   if (!element) return;
-  
-  // Check if it's a user message or assistant message
+
   const isUserMessage = element.classList.contains('user-message-content');
-  
+
   if (isUserMessage) {
-    // For user messages: preserve formatting
     element.innerHTML = formatUserMessage(content);
   } else {
-    // For assistant messages: render markdown
     element.innerHTML = converter.makeHtml(content);
   }
+}
+
+function getLoadingHTML() {
+  return `
+    <div class="typing-indicator">
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+    </div>
+  `;
 }
 
 // ========================================
@@ -592,10 +597,9 @@ async function handleFinishEntry() {
     const finishBtn = document.getElementById('finish-entry-btn');
     if (finishBtn) {
       finishBtn.disabled = true;
-      finishBtn.textContent = '⏳ Memorizing...'; // Changed text
+      finishBtn.textContent = '⏳ Memorizing...';
     }
 
-    // 1. Get Today's Messages
     const messages = await getMessages(currentDate);
     if (messages.length === 0) {
       showNotification('ℹ️ No messages to summarize');
@@ -606,23 +610,16 @@ async function handleFinishEntry() {
       return;
     }
 
-    // 2. Convert messages to a single text block
     const chatText = messages.map(m => `${m.role}: ${m.content}`).join('\n');
 
-    // 3. Get Previous Summary (The one before today)
     const allSummaries = await getAllSummaries();
-    // Filter out ANY summary that might already exist for TODAY (to avoid self-referencing if clicked twice)
     const pastSummaries = allSummaries.filter(s => s.Date !== currentDate);
-    // Sort descending
     pastSummaries.sort((a, b) => new Date(b.Date) - new Date(a.Date));
 
     const prevSummary = pastSummaries.length > 0 ? pastSummaries[0].Summary : "";
 
-    // 4. Request New Summary (Recursive)
-    // Note: We are now expecting a JSON response, not a stream, per the Python change
     const summaryData = await requestSummarization(currentDate, chatText, prevSummary);
 
-    // 5. Save logic remains similar
     if (summaryData && summaryData.summary) {
       const startId = messages[0].id;
       const endId = messages[messages.length - 1].id;
@@ -630,11 +627,24 @@ async function handleFinishEntry() {
       await saveSummary(currentDate, startId, endId, summaryData.summary);
       showNotification('✅ Memory updated successfully!');
 
-      // Optional: Display the new memory summary in the chat?
-      // displayMessage('system', "💾 Memory Updated: " + summaryData.summary);
+      // Display Summary in Log
+      const summaryHTML = `
+        <div class="text-sm text-gray-500 italic border-l-4 border-amber-300 pl-3 py-1 mt-4">
+          <strong>📝 Daily Summary Saved:</strong><br>
+          ${summaryData.summary}
+        </div>
+      `;
+
+      const messagesContainer = document.getElementById('messages');
+      if (messagesContainer) {
+        const div = document.createElement('div');
+        div.className = 'flex justify-center mb-4 w-full';
+        div.innerHTML = summaryHTML;
+        messagesContainer.appendChild(div);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
     }
 
-    // Sync to file if available
     const synced = await syncToFile();
     if (synced) {
       console.log('✅ Synced to file');

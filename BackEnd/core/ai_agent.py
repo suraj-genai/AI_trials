@@ -62,29 +62,37 @@ class JournalAgent:
         messages = []
 
         # 1. Dynamic System Prompt
+        # We enforce brevity and the "One Question Rule" here.
+        system_instructions = """
+        You are a warm, empathetic journaling assistant named Memory Grove.
+
+        CORE RULES:
+        1. Keep responses CONCISE (max 3-4 sentences usually).
+        2. Ask ONLY ONE thoughtful question at a time to keep the user focused.
+        3. Never overwhelm the user with a list of questions.
+        4. If the user mentions a significant event, acknowledge it deeply before moving on.
+        """
+
         if not user_context:
-            # FIRST TIME USER PROMPT
-            base_system_prompt = """
-            You are a warm, empathetic journaling assistant named Memory Grove.
+            # FIRST TIME USER
+            context_prompt = """
             This is the first time you are meeting this user.
-            Your goal is to gently get to know them. 
-            Ask open-ended questions about their life, interests, and how they want to use this journal.
-            Be inviting and safe.
+            Gently introduce yourself and get to know about them and their intentions with an AI journal.
             """
         else:
-            # RETURNING USER PROMPT
-            base_system_prompt = f"""
-            You are a warm, empathetic journaling assistant.
-
-            Here is what you know about the user from previous entries (LONG TERM MEMORY):
+            # RETURNING USER
+            context_prompt = f"""
+            LONG TERM MEMORY (Context):
             {user_context}
 
-            Use this memory to personalize your greeting and questions. 
-            Reference past events or feelings when appropriate to show you care.
-            Do not repeat the memory back to them robotically; weave it naturally into conversation.
+            INSTRUCTION:
+            Use the context to personalize your response. 
+            If the user has been away, welcome them back warmly.
+            Check on specific things mentioned in the memory (e.g., "How did that project go?").
             """
 
-        messages.append(SystemMessage(content=base_system_prompt))
+        full_system_prompt = f"{system_instructions}\n\n{context_prompt}"
+        messages.append(SystemMessage(content=full_system_prompt))
 
         # 2. Add History
         for msg in conversation_history:
@@ -94,7 +102,18 @@ class JournalAgent:
                 messages.append(AIMessage(content=msg.get('content', '')))
 
         # 3. Add Current Message
-        messages.append(HumanMessage(content=message))
+        # Special logic: If the frontend sends a specific trigger for greeting, we handle it as a system instruction
+        if message.startswith("[SYSTEM_TRIGGER_GREETING]"):
+            # This is the "hidden" prompt for the greeting
+            greeting_instruction = """
+             The user has just opened their journal for the day. 
+             Based on the time of day and the Long Term Memory, greet them warmly.
+             If there is a specific concern in the memory (e.g., they were sick), ask about it.
+             Otherwise, ask: "How are you feeling today?"
+             """
+            messages.append(HumanMessage(content=greeting_instruction))
+        else:
+            messages.append(HumanMessage(content=message))
 
         try:
             for chunk in self.llm.stream(messages):
