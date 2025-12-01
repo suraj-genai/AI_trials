@@ -15,24 +15,49 @@ const API_BASE_URL = window.location.origin;
  * @param {string} date - Current date in YYYY-MM-DD format
  * @returns {Promise<ReadableStreamDefaultReader>} Stream reader for SSE response
  */
-async function sendMessageToAI(message, history, date) {
+async function sendMessageToAI(message, history, date, context) {
+  // Added 'context' parameter
   const response = await fetch(`${API_BASE_URL}/api/chat`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       message: message,
       history: history,
-      date: date
+      date: date,
+      context: context // Send the long-term memory
     })
   });
 
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
-  }
-
+  if (!response.ok) throw new Error(`API error: ${response.status}`);
   return response.body.getReader();
+}
+
+async function requestSummarization(date, chatText, prevSummary) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/summarize`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        date: date,
+        chat_text: chatText,
+        previous_summary: prevSummary
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Summarization failed: ${response.status}`);
+    }
+
+    // Backend returns standard JSON, not a stream
+    const data = await response.json();
+    return data;
+
+  } catch (error) {
+    console.error('Error requesting summarization:', error);
+    throw error;
+  }
 }
 
 // ========================================
@@ -177,51 +202,3 @@ async function syncHistoryToBackend(conversations, messages, summaries) {
   }
 }
 
-// ========================================
-// Summarization API
-// ========================================
-
-/**
- * Request summarization for a specific date's conversation
- * @param {string} date - Date in YYYY-MM-DD format
- * @returns {Promise<Object>} Summary object with {summary, start_id, end_id}
- */
-async function requestSummarization(date) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/summarize`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        date: date
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Summarization failed: ${response.status}`);
-    }
-
-    // Handle streaming response for summarization
-    const reader = response.body.getReader();
-    let summaryText = '';
-    let summaryData = null;
-
-    for await (const chunk of streamResponse(reader)) {
-      summaryText += chunk;
-    }
-
-    // Parse final summary JSON if backend sends it
-    try {
-      summaryData = JSON.parse(summaryText);
-    } catch (e) {
-      // If not JSON, use as plain text
-      summaryData = { summary: summaryText };
-    }
-
-    return summaryData;
-  } catch (error) {
-    console.error('Error requesting summarization:', error);
-    throw error;
-  }
-}

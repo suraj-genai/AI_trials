@@ -329,53 +329,52 @@ function closeSettings() {
 
 async function handleSendMessage() {
   if (isStreaming) return;
-
   const input = document.getElementById('input');
   const message = input.value.trim();
-
   if (!message) return;
 
-  // Clear input
   input.value = '';
   input.style.height = 'auto';
 
-  // Save user message
   await saveMessage(currentDate, 'user', message);
   displayMessage('user', message);
 
-  // Get conversation history
   const history = await getMessages(currentDate);
 
-  // Stream AI response
+  // --- NEW LOGIC START ---
+  // Fetch the most recent summary (Long Term Memory)
+  const allSummaries = await getAllSummaries();
+  // Sort by date descending (newest first)
+  allSummaries.sort((a, b) => new Date(b.Date) - new Date(a.Date));
+
+  let context = "";
+  if (allSummaries.length > 0) {
+    // We use the MOST RECENT summary as context
+    context = allSummaries[0].Summary;
+  }
+  // --- NEW LOGIC END ---
+
   isStreaming = true;
   let aiResponse = '';
   const aiMessageElement = createMessageElement('assistant', '');
 
   try {
-    const reader = await sendMessageToAI(message, history, currentDate);
+    // Pass context to API
+    const reader = await sendMessageToAI(message, history, currentDate, context);
 
     for await (const chunk of streamResponse(reader)) {
       aiResponse += chunk;
-      // Update content during streaming (may not be perfectly formatted yet)
       updateMessageContent(aiMessageElement, aiResponse);
       const messagesContainer = document.getElementById('messages');
-      if (messagesContainer) {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      }
+      if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
-
-    // After streaming is complete, ensure proper markdown formatting
-    // Re-render the final content to ensure all markdown is properly converted
     updateMessageContent(aiMessageElement, aiResponse);
-
-    // Save complete AI response
     await saveMessage(currentDate, 'assistant', aiResponse);
 
   } catch (error) {
     console.error('Error:', error);
-    aiResponse = 'Sorry, I encountered an error. Please try again.';
+    aiResponse = 'Sorry, I encountered an error.';
     updateMessageContent(aiMessageElement, aiResponse);
-    await saveMessage(currentDate, 'assistant', aiResponse);
   } finally {
     isStreaming = false;
   }
@@ -590,56 +589,49 @@ async function handleFinishEntry() {
   }
 
   try {
-    // Disable button during summarization
     const finishBtn = document.getElementById('finish-entry-btn');
     if (finishBtn) {
       finishBtn.disabled = true;
-      finishBtn.textContent = '⏳ Summarizing...';
+      finishBtn.textContent = '⏳ Memorizing...'; // Changed text
     }
 
-    // Get messages for current date to determine start and end IDs
+    // 1. Get Today's Messages
     const messages = await getMessages(currentDate);
     if (messages.length === 0) {
       showNotification('ℹ️ No messages to summarize');
       if (finishBtn) {
-        finishBtn.disabled = false;
-        finishBtn.textContent = '✅ Finish';
+          finishBtn.disabled = false;
+          finishBtn.textContent = '✅ Finish';
       }
       return;
     }
 
-    const startId = messages[0].id;
-    const endId = messages[messages.length - 1].id;
+    // 2. Convert messages to a single text block
+    const chatText = messages.map(m => `${m.role}: ${m.content}`).join('\n');
 
-    // Request summarization from backend
-    let retryCount = 0;
-    let summaryData = null;
+    // 3. Get Previous Summary (The one before today)
+    const allSummaries = await getAllSummaries();
+    // Filter out ANY summary that might already exist for TODAY (to avoid self-referencing if clicked twice)
+    const pastSummaries = allSummaries.filter(s => s.Date !== currentDate);
+    // Sort descending
+    pastSummaries.sort((a, b) => new Date(b.Date) - new Date(a.Date));
 
-    while (retryCount < 2) {
-      try {
-        summaryData = await requestSummarization(currentDate);
-        break; // Success, exit retry loop
-      } catch (error) {
-        retryCount++;
-        if (retryCount >= 2) {
-          throw error; // Re-throw if all retries failed
-        }
-        console.log(`Summarization attempt ${retryCount} failed, retrying...`);
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
-      }
-    }
+    const prevSummary = pastSummaries.length > 0 ? pastSummaries[0].Summary : "";
 
-    // Save summary to IndexedDB
+    // 4. Request New Summary (Recursive)
+    // Note: We are now expecting a JSON response, not a stream, per the Python change
+    const summaryData = await requestSummarization(currentDate, chatText, prevSummary);
+
+    // 5. Save logic remains similar
     if (summaryData && summaryData.summary) {
-      await saveSummary(
-        currentDate,
-        startId,
-        endId,
-        summaryData.summary
-      );
-      showNotification('✅ Entry finished and summarized successfully!');
-    } else {
-      showNotification('⚠️ Summarization completed but no summary received');
+      const startId = messages[0].id;
+      const endId = messages[messages.length - 1].id;
+
+      await saveSummary(currentDate, startId, endId, summaryData.summary);
+      showNotification('✅ Memory updated successfully!');
+
+      // Optional: Display the new memory summary in the chat?
+      // displayMessage('system', "💾 Memory Updated: " + summaryData.summary);
     }
 
     // Sync to file if available
@@ -647,12 +639,10 @@ async function handleFinishEntry() {
     if (synced) {
       console.log('✅ Synced to file');
     }
-
-  } catch (error) {
+  }  catch (error) {
     console.error('Error finishing entry:', error);
-    showNotification('❌ Failed to summarize entry: ' + error.message);
+    showNotification('❌ Failed: ' + error.message);
   } finally {
-    // Re-enable button
     const finishBtn = document.getElementById('finish-entry-btn');
     if (finishBtn) {
       finishBtn.disabled = false;
