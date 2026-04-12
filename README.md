@@ -3,7 +3,7 @@ This repository is a collection of experimental and production-grade AI workflow
 
 ## 📁 Repository Directory (Branches)
 
-### 🌟 [Memory Grove](https://github.com/suraj-genai/AI_trials/tree/AI_journal)
+### 🌟 [Memory Grove](https://github.com/suraj-genai/AI_trials/tree/AI_Journal)
 *   **Status:** Deployed / Stable
 *   **Focus:** A privacy-first conversational journaling app using LangChain and browser IndexedDB.
 *   **How to run:** Detailed in the branch README.
