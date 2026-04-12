@@ -1,6 +1,17 @@
-# GenAI, Robotics & Control Systems Projects
+# AI Research & Prototyping Lab
+This repository is a collection of experimental and production-grade AI workflows, ranging from local-first journaling systems to intelligent tax-filing assistants.
 
-# Gen AI Projects
-1. AI Income Tax Returns Assistant (WIP) - A RAG based AI which can help in explain the Income Tax Filing procedures to anyone and advice them the procedure to create maximum returns -> link
-  
-2. AI based ADHD Focus Assistant - A major problem of ADHD is inability to focus on a specific topic, wandering attention whenever something interesting is encountered and scope creep which would turn out for the user to start working on the things beyond their scope of the project. The AI chatbot is a scheduler, time blocker, research assistant and then focus guide. The AI Chatbot would help the user plan their days as per their projects and proposed plans, understands the scope of the plans, and help the users through the chaos of their mind by keeping them stick to just one topic at a time for its respective time block. It would also implement an adaptive pomodoro timer which can take a note of the amount of time the user spends on working and resting. It would also log distractions and make a journal entry of it for later analysis. This is at a concept stage now. The focussed work on this to start post November 17th.  
+## 📁 Repository Directory (Branches)
+
+### 🌟 [Memory Grove](https://github.com/suraj-genai/AI_trials/tree/AI_journal)
+*   **Status:** Deployed / Stable
+*   **Focus:** A privacy-first conversational journaling app using LangChain and browser IndexedDB.
+*   **How to run:** Detailed in the branch README.
+
+### 📝 [AI Tax Assistant](https://github.com/suraj-genai/AI_trials/tree/AI_taxman_dev1)
+*   **Status:** In Development (Prototype)
+*   **Focus:** Intelligent guidance for Indian ITR filing leveraging GPT-4 and structured reasoning.
+
+### 🔍 [Document Intelligence](https://github.com/suraj-genai/AI_trials/tree/AI_assistant1_dev)
+*   **Status:** Research / Experimental
+*   **Focus:** RAG-based knowledge retrieval experiments.
