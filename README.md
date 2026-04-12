@@ -35,7 +35,7 @@ To run locally:
    ```
    OPENAI_API_KEY=your_api_key_here
    ```
-4. Run the backend application and open the frontend  
+4. Run the application using 'python BackEnd/app.py' and access the local URL provided in the terminal. 
 
 *Note: Local setup is optional. The app is primarily intended to be accessed via the hosted version.*
 
