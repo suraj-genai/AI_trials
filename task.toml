@@ -1,53 +1,46 @@
 schema_version = "1.1"
+
 artifacts = []
 
 [task]
-name = "terminal/firmware_debugging_problem"
-description = ""
-keywords = []
+name = "terminal/hardware_engineering__memory-allocator-debug"
+description = "Repair a constrained C memory allocator operating on a fixed 32 KiB arena."
+keywords = ["embedded systems", "memory allocator", "C", "firmware", "debugging"]
+
 [[task.authors]]
-name = ""
-email = ""
+name = "Suraj Parameswaran"
+email = "supa7645@experts.micro1.ai"
 
 [metadata]
 source = "m1-rl-envs"
 environment_id = "terminal"
-task_id = ""
-# Task domain: Software, Operations, Security, ML, Science,
-# Hardware & Engineering, or Media. Pick by the field the work is IN, not by
-# what you do in the terminal — debugging is a tag, not a domain.
-# Case-sensitive, and it must match the <domain>__ segment of [task].name above
-# (lowercased, non-alphanumerics folded to "_": hardware_engineering).
-category = ""
-# Subdomain within that domain. The set is fixed per domain and enforced — run
-# `rv check` and the error lists the valid ones. e.g. Software: Algorithms,
-# Systems, Backend & Distributed Systems, Databases, Data Engineering, ...
-subcategory = ""
-# Why a capable model fails this task, and what the intended failure mode is.
-# The Runs tab measures difficulty; this is where you explain it.
-difficulty_explanation = """
-"""
-# How the reference solution actually performs the task.
-solution_explanation = """
-"""
-# How the verifier decides success independently of the supplied fixture.
-verification_explanation = """
-"""
-author_name = ""
-author_email = ""
-tags = []
-expert_time_estimate_hours = 0.0
+task_id = "1"
+
+category = "Hardware & Engineering"
+subcategory = "Embedded Systems"
+
+difficulty_explanation = "This task uses a hand-authored C implementation of a constrained embedded-memory allocator, similar to firmware used by embedded engineers maintaining fixed-size controller memory. The allocator must translate logical allocation requests into physical column mappings while maintaining fragmentation, sharing, resizing, and serialized metadata invariants. The defect is exposed only through an interaction between allocation history and metadata serialization, so the task requires debugging behavior across multiple layers rather than fixing an isolated statement."
+
+solution_explanation = "The defect is an incorrect metadata record-length calculation in serialization: records with at least three physical segments and a non-1024-byte-aligned logical size have their body length reduced by four bytes even though all segments are still serialized. The repair removes that erroneous reduction so the encoded length matches the serialized metadata body and record boundaries remain valid."
+
+verification_explanation = "The verifier independently executes the allocator implementation through a deterministic multi-phase request sequence and checks logical mappings, sharing relationships, free-space accounting, metadata validity, and allocator invariants after the relevant phases." 
+
+author_name = "Suraj Parameswaran"
+author_email = "supa7645@experts.micro1.ai"
+tags = ["embedded-systems", "memory-allocator", "C", "debugging"]
+
+expert_time_estimate_hours = 8.0
 
 [verifier]
-timeout_sec = 3600.0
-
-# Multi-hour budgets are expected for contract-and-rulebook tasks that drive a
-# live service; raise this to what the task actually needs (up to 18000).
-[agent]
+user = "root"
 timeout_sec = 900.0
 
+[agent]
+user = "agent"
+timeout_sec = 1800.0
+
 [environment]
-build_timeout_sec = 600.0
+build_timeout_sec = 1800.0
 cpus = 2
 memory_mb = 4096
 storage_mb = 10240

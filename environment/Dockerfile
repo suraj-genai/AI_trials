@@ -18,3 +18,24 @@ RUN apt-get update \
 
 RUN mkdir -p /app /logs/verifier
 # === END realm base ===
+
+
+# --- task-specific dependencies ---
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        gcc \
+        libc6-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+
+# --- task files ---
+COPY data/allocator.c /app/allocator.c
+COPY data/allocator.h /app/allocator.h
+COPY data/metadata.c /app/metadata.c
+COPY data/metadata.h /app/metadata.h
+
+# --- writable workspace ---
+RUN useradd -m -s /bin/bash agent \
+ && mkdir -p /app/output /app/solution \
+ && chown agent:agent /app /app/output /app/solution \
+ && chown -R agent:agent /app/*.c /app/*.h
