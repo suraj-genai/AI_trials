@@ -1,18 +1,6 @@
 #include "metadata.h"
 #include <string.h>
 
-/*
- * PROTOCOL 2 (Palette Dictionary + Bit-Packed LRLT Stream):
- * - Byte 0: 0xB2 magic
- * - Byte 1: P = number of unique non-zero masks (0..63)
- * - Bytes 2 .. 2 + 2*P - 1: Palette table of uint16_t masks (index 1..P; index 0 is FREE=0)
- * - Bitstream starting at byte (2 + 2*P):
- *   For each contiguous run covering all 824 blocks:
- *   - idx_bits (ceil(log2(P+1)), 1..6 bits): palette index (0..P)
- *   - is_long (1 bit):
- *       0 -> next 4 bits = (run_len - 1) for run_len in 1..16
- *       1 -> next 10 bits = (run_len - 1) for run_len in 1..824
- */
 static uint8_t bits_for_palette(uint8_t p_count) {
     uint16_t total = (uint16_t)p_count + 1u; /* include 0 = free */
     uint8_t b = 1;

@@ -19,11 +19,11 @@ task_id = "1"
 category = "Hardware & Engineering"
 subcategory = "Embedded Systems"
 
-difficulty_explanation = "This task uses a hand-authored C implementation of a constrained embedded-memory allocator, similar to firmware used by embedded engineers maintaining fixed-size controller memory. The allocator must translate logical allocation requests into physical column mappings while maintaining fragmentation, sharing, resizing, and serialized metadata invariants. The defect is exposed only through an interaction between allocation history and metadata serialization, so the task requires debugging behavior across multiple layers rather than fixing an isolated statement."
+difficulty_explanation = "This task involves debugging a constrained embedded-memory allocator and its metadata handling. The implementation must process multiple allocation workloads while preserving fixed memory boundaries, shared ownership, payload integrity, protected firmware state, and correct metadata reconstruction. The debugging requires tracing allocator and metadata behavior across different workload histories and also considering the effect of physical memory movement and metadata size on the final score."
 
-solution_explanation = "The defect is an incorrect metadata record-length calculation in serialization: records with at least three physical segments and a non-1024-byte-aligned logical size have their body length reduced by four bytes even though all segments are still serialized. The repair removes that erroneous reduction so the encoded length matches the serialized metadata body and record boundaries remain valid."
+solution_explanation = "The candidate implementation contains defects in the Protocol 1 metadata encoding and decoding path. The repair must restore correct metadata generation and reconstruction across the supplied workloads while preserving the allocator's ownership state, payload integrity, protected firmware state, and the required total cost limit."
 
-verification_explanation = "The verifier independently executes the allocator implementation through a deterministic multi-phase request sequence and checks logical mappings, sharing relationships, free-space accounting, metadata validity, and allocator invariants after the relevant phases." 
+verification_explanation = "The verifier executes the candidate allocator against the supplied workload files and independently checks execution results, ownership consistency, metadata reconstruction, payload integrity, protected firmware state, memory boundaries, and the resulting metadata and physical-movement cost. The complete workload must remain within the configured total score threshold."
 
 author_name = "Suraj Parameswaran"
 author_email = "supa7645@experts.micro1.ai"

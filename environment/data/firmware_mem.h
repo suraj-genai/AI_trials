@@ -12,18 +12,26 @@
 #define FM_TOTAL_COLS         128u
 #define FM_TOTAL_BLOCKS       (FM_TOTAL_COLS * FM_ROWS) /* 1024 blocks */
 
-/* Column 0 (Blocks 0..7 = 256B): Primary Metadata Window */
+/* Column 0: Primary metadata window */
 #define FM_MD_PRIMARY_BYTES   256u
-#define FM_MD_FAST_BYTES      224u   /* First 7 blocks of Col 0 (L1 fast window) */
-#define FM_MD_MAX_CHAIN_BYTES 1024u  /* Max chained metadata buffer */
+#define FM_MD_FAST_BYTES      224u
 
-/* Columns 1..103 (824 blocks): Payload Arena (indices 0..823) */
+/* One restricted column is available for metadata extension */
+#define FM_MD_EXTENSION_BYTES (FM_BLOCK_BYTES * FM_ROWS) /* 256 B */
+#define FM_MD_MAX_CHAIN_BYTES \
+    (FM_MD_PRIMARY_BYTES + FM_MD_EXTENSION_BYTES)        /* 512 B */
+
+/* Columns 1..103: Payload arena */
 #define FM_PAYLOAD_COLS       103u
-#define FM_PAYLOAD_BLOCKS     (FM_PAYLOAD_COLS * FM_ROWS) /* 824 blocks */
+#define FM_PAYLOAD_BLOCKS     (FM_PAYLOAD_COLS * FM_ROWS) /* 824 */
 
-/* Columns 104..127 (192 blocks): Scratchpad Arena (indices 0..191) */
-#define FM_SCRATCH_COLS       24u
-#define FM_SCRATCH_BLOCKS     (FM_SCRATCH_COLS * FM_ROWS) /* 192 blocks */
+/* Columns 104..123: Scratchpad */
+#define FM_SCRATCH_COLS       20u
+#define FM_SCRATCH_BLOCKS     (FM_SCRATCH_COLS * FM_ROWS) /* 160 */
+
+/* Columns 124..127: Restricted region */
+#define FM_RESTRICTED_COLS    4u
+#define FM_RESTRICTED_BLOCKS  (FM_RESTRICTED_COLS * FM_ROWS) /* 32 */
 
 /* Address domains for fm_move_block() */
 typedef enum {

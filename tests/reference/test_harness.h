@@ -16,15 +16,6 @@ typedef struct {
     uint32_t total_moves;
 } TestHarnessResult;
 
-/*
- * Execute one workload from a trusted file path.
- *
- * The function calls fm_init() and allocator_init(), executes every valid
- * instruction, and relies on fm_end_instruction() for the simulator's
- * per-instruction integrity, codec round-trip, and scoring checks.
- *
- * Returns true only when the complete workload passes.
- */
 bool test_harness_run_workload(const char *workload_path,
                                TestHarnessResult *result,
                                char *error_buffer,

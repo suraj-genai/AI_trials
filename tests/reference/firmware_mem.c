@@ -27,7 +27,6 @@
 _Static_assert(FM_PROTECTED_OFFSET + FM_PROTECTED_BYTES == FM_ARENA_BYTES,
                "Physical memory map does not cover the complete arena");
 
-/* Internal 32KB physical arena + ground-truth tracking (all static/locked) */
 static uint8_t  g_arena[FM_ARENA_BYTES];
 static uint32_t g_gt_packet_id[FM_PAYLOAD_BLOCKS];
 
@@ -35,16 +34,13 @@ static bool     g_scratch_used[FM_SCRATCH_BLOCKS];
 static uint16_t g_scratch_owners[FM_SCRATCH_BLOCKS];
 static uint32_t g_scratch_packet_id[FM_SCRATCH_BLOCKS];
 
-/* Reconstructed diagnostic copy; never authoritative storage */
 static uint8_t g_md_readback[FM_MD_MAX_CHAIN_BYTES];
 
 static size_t g_md_len = 0;
 static bool   g_md_committed_this_step = false;
 
-/* Expected contents of the protected 768-byte region */
 static uint8_t g_protected_expected[FM_PROTECTED_BYTES];
 
-/* Instruction tracking */
 static bool     g_in_step = false;
 static bool     g_step_is_alloc = false;
 static uint16_t g_step_mask = 0;
@@ -54,7 +50,6 @@ static int32_t  g_step_Initial_matching_blocks = 0;
 static uint32_t g_next_packet_id = 1;
 static uint32_t g_rng_state = 0xA53C9E17u;
 
-/* Scoring & telemetry */
 static uint64_t g_score_metadata = 0;
 static uint64_t g_score_moves = 0;
 static size_t   g_peak_md_bytes = 0;
@@ -81,7 +76,6 @@ static size_t scratch_byte_offset(uint16_t sidx)
     return FM_SCRATCH_OFFSET + ((size_t)sidx * FM_BLOCK_BYTES);
 }
 
-/* Generate deterministic 32-byte packet for (packet_id, owner_mask) */
 static void build_packet_bytes(uint32_t packet_id, uint16_t owner_mask, uint8_t out[32]) {
     uint64_t h = 1469598103934665603ULL;
     out[0] = (uint8_t)(packet_id & 0xFFu);
@@ -104,16 +98,16 @@ static void build_packet_bytes(uint32_t packet_id, uint16_t owner_mask, uint8_t 
 }
 
 static uint64_t compute_step_metadata_penalty(size_t md_len) {
-    /* Tier 1: Fast L1 Register Window (0 .. 224 bytes = first 7 blocks of Col 0) */
+
     if (md_len <= FM_MD_FAST_BYTES) {
         return (uint64_t)md_len;
     }
-    /* Tier 2: L1 Contention Zone (225 .. 256 bytes = 8th block of Col 0) */
+
     if (md_len <= FM_MD_PRIMARY_BYTES) {
         uint64_t over_224 = (uint64_t)(md_len - FM_MD_FAST_BYTES);
         return (uint64_t)FM_MD_FAST_BYTES + (over_224 * over_224 * 4ULL);
     }
-    /* Tier 3: Chained Paging Mode (> 256 bytes) */
+
     uint64_t base_col0 = (uint64_t)FM_MD_FAST_BYTES + (32ULL * 32ULL * 4ULL); /* 4,320 */
     uint64_t chained_bytes = (uint64_t)(md_len - FM_MD_PRIMARY_BYTES);
     uint64_t chained_blocks = (chained_bytes + 31ULL) / 32ULL;
@@ -203,7 +197,6 @@ bool fm_free_block(uint16_t payload_idx) {
 bool fm_move_block(fm_domain_t src_dom, uint16_t src_idx,
                    fm_domain_t dst_dom, uint16_t dst_idx) {
     if (!g_in_step) return false;
-    /* Hardware rule: Payload <-> Scratchpad only (no direct Payload -> Payload moves) */
     if (src_dom == FM_DOMAIN_PAYLOAD && dst_dom == FM_DOMAIN_PAYLOAD) {
         return false;
     }
@@ -290,7 +283,6 @@ bool fm_commit_metadata(const uint8_t *buf, size_t len)
         return false;
     }
 
-    /* Clear only the two metadata storage regions */
     memset(&g_arena[FM_PRIMARY_OFFSET],
            0,
            FM_MD_PRIMARY_BYTES);
@@ -299,12 +291,10 @@ bool fm_commit_metadata(const uint8_t *buf, size_t len)
            0,
            FM_MD_EXTENSION_BYTES);
 
-    /* Store primary metadata in Column 0 */
     memcpy(&g_arena[FM_PRIMARY_OFFSET],
            buf,
            primary_len);
 
-    /* Store the overflow portion in restricted Column 124 */
     if (extension_len > 0) {
         memcpy(&g_arena[FM_MD_EXTENSION_OFFSET],
                buf + FM_MD_PRIMARY_BYTES,
@@ -393,7 +383,6 @@ bool fm_end_instruction(uint32_t step_num) {
     if (!g_in_step) return false;
     g_in_step = false;
 
-    /* 1. Check instruction count fulfillment */
     if (g_step_is_alloc) {
         if (g_step_actual_count != g_step_expected_count) {
             fprintf(stderr, "[Step %u] FAIL: ALLOC expected %d blocks, allocated %d\n",
@@ -412,7 +401,6 @@ bool fm_end_instruction(uint32_t step_num) {
         }
     }
 
-    /* 2. Verify all scratchpad blocks are empty at end of instruction */
     for (uint16_t s = 0; s < FM_SCRATCH_BLOCKS; s++) {
         if (g_scratch_used[s]) {
             fprintf(stderr, "[Step %u] FAIL: Scratchpad block %u left occupied\n", step_num, s);
@@ -420,7 +408,6 @@ bool fm_end_instruction(uint32_t step_num) {
         }
     }
 
-    /* 3. Verify 32-byte packet integrity for all 824 payload blocks */
     uint8_t expected_pkt[FM_BLOCK_BYTES];
     for (uint16_t i = 0; i < FM_PAYLOAD_BLOCKS; i++) {
         const uint8_t *actual_pkt = &g_arena[payload_byte_offset(i)];
@@ -444,7 +431,6 @@ bool fm_end_instruction(uint32_t step_num) {
        return false;
     }
 
-    /* 4. Verify metadata was committed and passes anti-cheat canary + blind round-trip */
     if (!g_md_committed_this_step) {
         fprintf(stderr, "[Step %u] FAIL: Metadata not committed\n", step_num);
         return false;
@@ -457,7 +443,6 @@ bool fm_end_instruction(uint32_t step_num) {
     generate_canary_map(canary_a);
     generate_canary_map(canary_b);
 
-    /* Calling md_encode on canary maps overwrites any static shadow state in metadata.c */
     if (!md_encode(canary_a, buf_a, sizeof(buf_a), &len_a) ||
         !md_encode(canary_b, buf_b, sizeof(buf_b), &len_b)) {
         fprintf(stderr, "[Step %u] FAIL: Canary md_encode failed\n", step_num);
@@ -474,7 +459,6 @@ bool fm_end_instruction(uint32_t step_num) {
         return false;
     }
 
-    /* Out-of-order blind decode: canary_a, then real committed buffer, then canary_b */
     uint16_t dec_a[FM_PAYLOAD_BLOCKS], dec_real[FM_PAYLOAD_BLOCKS], dec_b[FM_PAYLOAD_BLOCKS];
     if (!md_decode(buf_a, len_a, dec_a) ||
         !md_decode(committed_buf, g_md_len, dec_real) ||
@@ -502,7 +486,6 @@ bool fm_end_instruction(uint32_t step_num) {
         return false;
     }
 
-    /* 5. Update telemetry and penalty score */
     if (g_md_len > g_peak_md_bytes) g_peak_md_bytes = g_md_len;
     if (g_md_len > FM_MD_FAST_BYTES) g_over224_steps++;
     if (g_md_len > FM_MD_PRIMARY_BYTES) g_over256_steps++;

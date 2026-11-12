@@ -33,6 +33,12 @@ COPY data/allocator.c /app/allocator.c
 COPY data/allocator.h /app/allocator.h
 COPY data/metadata.c /app/metadata.c
 COPY data/metadata.h /app/metadata.h
+COPY data/firmware_mem.h /app/firmware_mem.h
+COPY data/workloads/instructions_1.txt /app/workloads/instructions_1.txt
+COPY data/workloads/instructions_2.txt /app/workloads/instructions_2.txt
+COPY data/workloads/instructions_3.txt /app/workloads/instructions_3.txt
+COPY data/CONTRACT.md /app/CONTRACT.md
+COPY data/Artifacts.md /app/Artifacts.md
 
 # --- writable workspace ---
 RUN useradd -m -s /bin/bash agent \

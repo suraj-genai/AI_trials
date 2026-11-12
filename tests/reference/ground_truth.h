@@ -5,16 +5,6 @@
 #include <stdbool.h>
 #include "firmware_mem.h"
 
-/*
- * Trusted reference ownership state.
- *
- * This represents the semantic state of the payload arena:
- *   0      = free
- *   nonzero = entity/group ownership mask
- *
- * This module contains no allocator policy and no metadata encoding.
- */
-
 void gt_init(void);
 
 uint16_t gt_get_owner(uint16_t payload_idx);

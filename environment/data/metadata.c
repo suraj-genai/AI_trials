@@ -1,13 +1,6 @@
 #include "metadata.h"
 #include <string.h>
 
-/*
- * PROTOCOL 1 (Verbose Segment Table):
- * - Header (2 bytes): [0] = 0xA1 magic, [1] = segment_count (uint8_t, up to 250)
- * - Body (4 bytes per non-zero contiguous run, max run length 64 per entry):
- *   - uint16_t packed_geom = (start_idx & 0x3FF) | (((run_len - 1) & 0x3F) << 10)
- *   - uint16_t group_mask
- */
 bool md_encode(const uint16_t owners[FM_PAYLOAD_BLOCKS],
                uint8_t *out_buf,
                size_t max_out_len,
@@ -32,8 +25,8 @@ bool md_encode(const uint16_t owners[FM_PAYLOAD_BLOCKS],
         }
         if (pos + 4 > max_out_len || seg_count >= 255) return false;
 
-        uint16_t geom = (uint16_t)((start & 0x3FFu) | (((run_len - 1u) & 0x3Fu) << 10));
-        out_buf[pos + 0] = (uint8_t)(geom & 0xFFu);
+        uint16_t geom = (uint16_t)((start & 0x1FFu) | (((run_len - 1u) & 0x3Fu) << 10));  // Bug 2
+        out_buf[pos + 0] = (uint8_t)(geom & 0xFFu); 
         out_buf[pos + 1] = (uint8_t)((geom >> 8) & 0xFFu);
         out_buf[pos + 2] = (uint8_t)(mask & 0xFFu);
         out_buf[pos + 3] = (uint8_t)((mask >> 8) & 0xFFu);
@@ -56,7 +49,6 @@ bool md_decode(const uint8_t *in_buf,
     uint16_t seg_count = in_buf[1];
     if (in_len != (size_t)(2 + seg_count * 4)) return false;
 
-    memset(out_owners, 0, sizeof(uint16_t) * FM_PAYLOAD_BLOCKS);
     size_t pos = 2;
     for (uint16_t s = 0; s < seg_count; s++) {
         uint16_t geom = (uint16_t)in_buf[pos] | ((uint16_t)in_buf[pos + 1] << 8);
@@ -64,7 +56,7 @@ bool md_decode(const uint8_t *in_buf,
         pos += 4;
 
         uint16_t start = geom & 0x3FFu;
-        uint16_t run_len = ((geom >> 10) & 0x3Fu) + 1u;
+        uint16_t run_len = ((geom >> 10) & 0x3Fu);
         if (mask == 0 || start + run_len > FM_PAYLOAD_BLOCKS) return false;
 
         for (uint16_t k = 0; k < run_len; k++) {

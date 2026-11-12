@@ -7,24 +7,22 @@ from pathlib import Path
 
 import pytest
 
-# Harbor layout: candidate files are writable under /app; verifier files are
-# read-only under /tests. The fallback paths make the same test runnable from
-# the source repository during local development.
+
 APP = Path("/app")
 TESTS = Path("/tests")
 BUILD_DIR = Path("/tmp/firmware_allocator_verifier")
 CANDIDATE_BUILD_DIR = BUILD_DIR / "candidate"
 BINARY = BUILD_DIR / "allocator_harness"
 
-MAX_TOTAL_SCORE = 50000 # Frozen Protocol-2 reference score; lower is better.
+MAX_TOTAL_SCORE = 50000 
 WORKLOAD_NAMES = (
     "instructions_1.txt",
     "instructions_2.txt",
     "instructions_3.txt",
 )
 
-
 def _first_existing(*paths: Path) -> Path:
+    """Return the first existing file from the supplied paths."""
     for path in paths:
         if path.is_file():
             return path
@@ -33,6 +31,7 @@ def _first_existing(*paths: Path) -> Path:
 
 
 def _first_existing_dir(*paths: Path) -> Path:
+    """Return the first existing directory from the supplied paths."""
     for path in paths:
         if path.is_dir():
             return path
@@ -61,8 +60,7 @@ def _layout() -> tuple[Path, Path, Path, Path]:
 
 
 def _safe_environment() -> dict[str, str]:
-    # Do not inherit PYTHONPATH, LD_PRELOAD, compiler wrappers, or other
-    # agent-controlled environment variables into the verifier subprocesses.
+    """Return a minimal environment for subprocesses to avoid agent-injected libraries and other interference."""
     return {
         "PATH": "/usr/bin:/bin",
         "LC_ALL": "C",
@@ -72,13 +70,11 @@ def _safe_environment() -> dict[str, str]:
 
 
 def _compile_harness() -> tuple[Path, Path]:
+    """Compile the trusted harness and return the binary path and workloads directory."""
     candidate_dir, reference_dir, workloads_dir, repo_root = _layout()
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
     CANDIDATE_BUILD_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Copy only the candidate implementation and its public headers. Compiling
-    # from this clean directory ensures quoted includes resolve the trusted
-    # firmware_mem.h in reference_dir, not an agent-replaced copy in /app.
     candidate_files = (
         "allocator.c",
         "allocator.h",
@@ -89,7 +85,6 @@ def _compile_harness() -> tuple[Path, Path]:
         source = _first_existing(candidate_dir / filename)
         shutil.copyfile(source, CANDIDATE_BUILD_DIR / filename)
 
-    # Never fall back to a copy under /app: that tree is agent-writable.
     trusted_firmware = _first_existing(reference_dir / "firmware_mem.c")
     trusted_ground_truth = _first_existing(reference_dir / "ground_truth.c")
     trusted_harness = _first_existing(reference_dir / "test_harness.c")
@@ -140,6 +135,7 @@ def _compile_harness() -> tuple[Path, Path]:
 
 
 def _expected_instruction_count(path: Path) -> int:
+    """Return the expected instruction count for a workload file."""
     count = 0
     with path.open("r", encoding="utf-8") as handle:
         for raw_line in handle:
@@ -150,6 +146,7 @@ def _expected_instruction_count(path: Path) -> int:
 
 
 def _run_workload(binary: Path, workload: Path) -> dict[str, int]:
+    """Run the trusted harness on a workload and return the parsed RESULT payload."""
     result = subprocess.run(
         [str(binary), str(workload)],
         cwd=str(workload.parent),
@@ -185,6 +182,7 @@ def _run_workload(binary: Path, workload: Path) -> dict[str, int]:
 
 
 def test_allocator_passes_trusted_workloads_and_score_target() -> None:
+    """Verify workload completion, integrity, and performance requirements."""
     binary, workloads_dir = _compile_harness()
 
     workload_results: list[tuple[str, dict[str, int]]] = []

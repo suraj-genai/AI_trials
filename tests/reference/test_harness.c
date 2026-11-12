@@ -49,7 +49,6 @@ static char *trim(char *text)
     return text;
 }
 
-/* The workload uses decimal entity IDs 1..16, separated by spaces/commas. */
 static bool parse_group_mask(const char *text, uint16_t *mask_out)
 {
     const char *cursor = text;
@@ -104,7 +103,7 @@ static bool parse_count(const char *text, bool is_alloc, int32_t *count_out)
         if (is_alloc) {
             return false;
         }
-        *count_out = -1; /* Empty DEALLOC count means free all matching blocks. */
+        *count_out = -1; 
         return true;
     }
 

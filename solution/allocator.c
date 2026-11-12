@@ -3,16 +3,11 @@
 #include "metadata.h"
 #include <string.h>
 
-/*
- * Lazy Scratchpad Compactor:
- * Groups split segments of the same group_mask together via the 192-block scratchpad
- * ONLY when metadata byte length approaches the 224-byte L1 cliff (threshold = 216B).
- */
+
 static bool compact_arena_via_scratchpad(void) {
     uint16_t owners[FM_PAYLOAD_BLOCKS];
     fm_get_all_owners(owners);
 
-    /* Collect unique active group masks in order of appearance */
     uint16_t groups[64];
     uint8_t g_count = 0;
     for (uint16_t i = 0; i < FM_PAYLOAD_BLOCKS; i++) {
@@ -25,7 +20,6 @@ static bool compact_arena_via_scratchpad(void) {
         if (!seen && g_count < 64) groups[g_count++] = m;
     }
 
-    /* Build target contiguous layout in lower payload indices */
     uint16_t target_mask[FM_PAYLOAD_BLOCKS];
     memset(target_mask, 0, sizeof(target_mask));
     uint16_t write_cursor = 0;
@@ -38,7 +32,6 @@ static bool compact_arena_via_scratchpad(void) {
         }
     }
 
-    /* Relocate only mismatched blocks in batches of up to FM_SCRATCH_BLOCKS (192) */
     uint16_t scratch_src_mask[FM_SCRATCH_BLOCKS];
     while (1) {
         uint16_t s_count = 0;
@@ -51,7 +44,6 @@ static bool compact_arena_via_scratchpad(void) {
         }
         if (s_count == 0) break;
 
-        /* Place staged scratchpad blocks into matching free target slots */
         for (uint16_t s = 0; s < s_count; s++) {
             uint16_t m = scratch_src_mask[s];
             bool placed = false;
@@ -83,7 +75,6 @@ static bool sync_metadata_with_lazy_compaction(void) {
     fm_get_all_owners(owners);
     if (!md_encode(owners, md_buf, sizeof(md_buf), &md_len)) return false;
 
-    /* Trigger compaction ONLY if metadata approaches the 224B fast-window cliff */
     if (md_len > 216u) {
         if (!compact_arena_via_scratchpad()) return false;
         fm_get_all_owners(owners);
@@ -97,7 +88,6 @@ void allocator_init(void) {}
 bool allocator_alloc(uint16_t group_mask, uint32_t count) {
     uint32_t allocated = 0;
 
-    /* Pass 1: Affinity placement — expand immediately adjacent to existing group_mask runs */
     while (allocated < count) {
         bool found_adj = false;
         for (uint16_t i = 0; i < FM_PAYLOAD_BLOCKS && allocated < count; i++) {
@@ -113,7 +103,6 @@ bool allocator_alloc(uint16_t group_mask, uint32_t count) {
         if (!found_adj) break;
     }
 
-    /* Pass 2: Contiguous hole search — find a single free gap >= remaining */
     uint32_t rem = count - allocated;
     if (rem > 0) {
         uint16_t best_start = 0xFFFFu;
@@ -137,7 +126,6 @@ bool allocator_alloc(uint16_t group_mask, uint32_t count) {
         }
     }
 
-    /* Pass 3: Fallback linear first-fit for any remaining blocks */
     for (uint16_t i = 0; i < FM_PAYLOAD_BLOCKS && allocated < count; i++) {
         if (fm_get_block_owner(i) == 0) {
             if (!fm_alloc_block(i, group_mask)) return false;
