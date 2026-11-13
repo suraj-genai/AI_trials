@@ -1,0 +1,62 @@
+schema_version = "1.1"
+artifacts = []
+
+[task]
+name = "terminal/data_debug_task2"
+description = ""
+keywords = []
+[[task.authors]]
+name = ""
+email = ""
+
+[metadata]
+source = "m1-rl-envs"
+environment_id = "terminal"
+task_id = ""
+# Task domain: Software, Operations, Security, ML, Science,
+# Hardware & Engineering, or Media. Pick by the field the work is IN, not by
+# what you do in the terminal — debugging is a tag, not a domain.
+# Case-sensitive, and it must match the <domain>__ segment of [task].name above
+# (lowercased, non-alphanumerics folded to "_": hardware_engineering).
+category = ""
+# Subdomain within that domain. The set is fixed per domain and enforced — run
+# `rv check` and the error lists the valid ones. e.g. Software: Algorithms,
+# Systems, Backend & Distributed Systems, Databases, Data Engineering, ...
+subcategory = ""
+# Why a capable model fails this task, and what the intended failure mode is.
+# The Runs tab measures difficulty; this is where you explain it.
+difficulty_explanation = """
+"""
+# How the reference solution actually performs the task.
+solution_explanation = """
+"""
+# How the verifier decides success independently of the supplied fixture.
+verification_explanation = """
+"""
+author_name = ""
+author_email = ""
+tags = []
+expert_time_estimate_hours = 0.0
+
+[verifier]
+timeout_sec = 3600.0
+
+# Multi-hour budgets are expected for contract-and-rulebook tasks that drive a
+# live service; raise this to what the task actually needs (up to 18000).
+[agent]
+timeout_sec = 900.0
+
+[environment]
+build_timeout_sec = 600.0
+cpus = 2
+memory_mb = 4096
+storage_mb = 10240
+gpus = 0
+network_mode = "public"
+mcp_servers = []
+
+[verifier.env]
+
+[environment.env]
+
+[solution.env]
