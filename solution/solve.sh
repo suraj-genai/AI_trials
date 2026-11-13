@@ -6,4 +6,4 @@
 
 set -euo pipefail
 
-echo "TODO: implement the solution"
+python3 /solution/solve.py

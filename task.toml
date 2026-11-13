@@ -3,40 +3,54 @@ artifacts = []
 
 [task]
 name = "terminal/data_debug_task2"
-description = ""
+description = "Repair a storage engine's crash-recovery build so it rebuilds the committed key-value table from a write-ahead journal: honour the written contract on torn writes, commit durability, fuzzy checkpoints, idempotent redo and delete semantics, on the crash cases the shipped samples never show."
 keywords = []
 [[task.authors]]
-name = ""
-email = ""
+name = "suraj parameswaran"
+email = "supa7645@expert.micro1.ai"
 
 [metadata]
 source = "m1-rl-envs"
 environment_id = "terminal"
-task_id = ""
+task_id = "8788"
 # Task domain: Software, Operations, Security, ML, Science,
 # Hardware & Engineering, or Media. Pick by the field the work is IN, not by
 # what you do in the terminal — debugging is a tag, not a domain.
 # Case-sensitive, and it must match the <domain>__ segment of [task].name above
 # (lowercased, non-alphanumerics folded to "_": hardware_engineering).
-category = ""
+category = "Software"
 # Subdomain within that domain. The set is fixed per domain and enforced — run
 # `rv check` and the error lists the valid ones. e.g. Software: Algorithms,
 # Systems, Backend & Distributed Systems, Databases, Data Engineering, ...
-subcategory = ""
+subcategory = "Databases"
 # Why a capable model fails this task, and what the intended failure mode is.
 # The Runs tab measures difficulty; this is where you explain it.
-difficulty_explanation = """
+difficulty_explanation = """The build under /app/store recovers a durable key-value table after a crash. Several recovery behaviors are incorrect only when journal boundaries, transaction state, checkpoint state and updates interact. The supplied samples exercise ordinary recovery but do not establish that the implementation is complete.
+
+The journals are synthetic and generated specifically for this task. Their record format follows realistic write-ahead-log recovery patterns including checksums, transactions, checkpoints and reuse of a preallocated log.
+
+The difficult part is reconciling the written recovery semantics across corruption, transaction durability, checkpoint state and update replay. The task therefore requires reasoning across multiple interacting recovery states, not merely reproducing the supplied examples.
 """
 # How the reference solution actually performs the task.
-solution_explanation = """
+solution_explanation = """Read /app/data/WAL_FORMAT.md for the journal layout and recovery semantics. Use /app/data/samples/ to validate ordinary parsing and recovery behavior.
+
+The repaired build must reconstruct the committed state represented by the durable journal while respecting transaction durability, the selected checkpoint and idempotent replay. Keep the documented entry points and report the rules violated by the shipped build.
+
+The reference repair under solution/store/ provides the implementation used by the oracle.
 """
 # How the verifier decides success independently of the supplied fixture.
-verification_explanation = """
+verification_explanation = """The verifier draws two fixed held-out graded journals using seeds that are not exposed to the agent, copies the identical bytes into separate agent and hidden reference environments, recovers each with both builds, and compares the recovered tables. Every run of the agent's build is started as an unprivileged uid (65534), while the verifier's reference materials remain inaccessible to the agent.
+
+The recovered table is graded by EXACT match, key for key and value for value; findings.json is graded as an exact set of rule ids from WAL_FORMAT.md's closed vocabulary. Three verifier-owned micro-journals exercise corruption, transaction/checkpoint/replay interactions, and add/delete behavior. A structural parsing check exercises parse_line without assigning checksum validation to that helper; checksum validity and the durable-prefix stopping rule are tested through durable_prefix. A second independently drawn graded window is recovered and compared as well, and a determinism check recovers one window twice and requires the same table.
+
+The one inequality in the suite is the timing gate: a full recovery of a graded window must finish in under 10 seconds. This is a liveness floor rather than a performance requirement. The reference recovery was reconciled against an independent per-key reconstruction over 300 graded and 900 sample windows with 0 disagreements, and generated journals are deterministic under multiple PYTHONHASHSEED values.
+
+The grade is based on the verifier's structured test report rather than pytest's exit status. The verifier validates the integrity of its grading inputs and fails closed on verifier startup problems. Reference and shipped-build validation is independent of the agent's own test modifications.
 """
-author_name = ""
-author_email = ""
+author_name = "suraj parameswaran"
+author_email = "supa7645@expert.micro1.ai"
 tags = []
-expert_time_estimate_hours = 0.0
+expert_time_estimate_hours = 8.0
 
 [verifier]
 timeout_sec = 3600.0
@@ -44,10 +58,10 @@ timeout_sec = 3600.0
 # Multi-hour budgets are expected for contract-and-rulebook tasks that drive a
 # live service; raise this to what the task actually needs (up to 18000).
 [agent]
-timeout_sec = 900.0
+timeout_sec = 1800.0
 
 [environment]
-build_timeout_sec = 600.0
+build_timeout_sec = 1800.0
 cpus = 2
 memory_mb = 4096
 storage_mb = 10240
